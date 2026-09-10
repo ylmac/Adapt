@@ -1,0 +1,83 @@
+import QtQuick
+import md3.Core
+
+// MD3-style bottom navigation bar (phone): five items spread evenly, each with
+// an animated selection pill + ripple. Parameterless signal + property payload
+// (qml4j can't read cross-file signal params). Absolute positioning, not a
+// RowLayout: this bar is always visible and the 5x/s play clock forces a
+// whole-tree relayout each tick — keep it cheap to measure.
+Rectangle {
+    id: bar
+
+    property int currentIndex: 0
+    property int pendingIndex: 0
+    signal navigate()
+
+    property var items: {
+        var out = [
+            { icon: "recommend",     label: "推荐" },
+            { icon: "search",        label: "搜索" },
+            { icon: "library_music", label: "我的" },
+            { icon: "history",       label: "最近" }
+        ]
+        if (settings.showLocalTab !== false) out.push({ icon: "folder", label: "本地" })
+        return out
+    }
+
+    implicitHeight: 76
+    color: Theme.color.surfaceContainer
+
+    Item {
+        id: navRow
+        anchors.fill: parent
+        anchors.topMargin: 8
+        anchors.bottomMargin: 8
+        property real itemW: width / bar.items.length
+
+        Repeater {
+            model: bar.items
+            Item {
+                id: navItem
+                width: navRow.itemW
+                height: navRow.height
+                x: index * navRow.itemW
+                property bool selected: index === bar.currentIndex
+                property color indColor: Theme.color.secondaryContainer
+
+                Rectangle {
+                    id: pill
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    width: 64; height: 32; radius: 16
+                    color: Qt.rgba(navItem.indColor.r, navItem.indColor.g,
+                                   navItem.indColor.b, navItem.selected ? 1 : 0)
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    // Center in the pill, not a fixed top margin: the icon font's line
+                    // box / baseline dropped the glyph below the pill's centre.
+                    anchors.verticalCenter: pill.verticalCenter
+                    text: modelData.icon
+                    font.family: Theme.iconFont.name
+                    font.pixelSize: 22
+                    color: navItem.selected ? Theme.color.onSecondaryContainerColor
+                                            : Theme.color.onSurfaceVariantColor
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 38
+                    text: modelData.label
+                    fontSize: 11
+                    color: navItem.selected ? Theme.color.onSurfaceColor
+                                            : Theme.color.onSurfaceVariantColor
+                }
+                Ripple {
+                    anchors.fill: parent
+                    clipRadius: 16
+                    onClicked: { bar.pendingIndex = index; bar.navigate() }
+                }
+            }
+        }
+    }
+}

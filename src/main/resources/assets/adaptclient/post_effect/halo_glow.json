@@ -1,0 +1,162 @@
+{
+  "targets": {
+    "adaptclient:halo_scene": {},
+    "adaptclient:halo_blur_x": {},
+    "adaptclient:halo_blur_y": {},
+    "adaptclient:halo_final": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "minecraft:post/blit",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        }
+      ],
+      "uniforms": {
+        "BlitConfig": [
+          {
+            "name": "ColorModulate",
+            "type": "vec4",
+            "value": [1.0, 1.0, 1.0, 1.0]
+          }
+        ]
+      },
+      "output": "adaptclient:halo_scene"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "adaptclient:post/halo_blur",
+      "inputs": [
+        {
+          "sampler_name": "Mask",
+          "target": "adaptclient:halo_mask",
+          "bilinear": false
+        },
+        {
+          "sampler_name": "MaskDepth",
+          "target": "adaptclient:halo_mask",
+          "use_depth_buffer": true,
+          "bilinear": false
+        },
+        {
+          "sampler_name": "SceneDepth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true,
+          "bilinear": false
+        }
+      ],
+      "output": "adaptclient:halo_blur_x",
+      "uniforms": {
+        "HaloBlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec2",
+            "value": [1.0, 0.0]
+          },
+          {
+            "name": "Radius",
+            "type": "float",
+            "value": 4.0
+          },
+          {
+            "name": "DepthEpsilon",
+            "type": "float",
+            "value": 0.0015
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "adaptclient:post/halo_blur",
+      "inputs": [
+        {
+          "sampler_name": "Mask",
+          "target": "adaptclient:halo_blur_x",
+          "bilinear": false
+        },
+        {
+          "sampler_name": "MaskDepth",
+          "target": "adaptclient:halo_mask",
+          "use_depth_buffer": true,
+          "bilinear": false
+        },
+        {
+          "sampler_name": "SceneDepth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true,
+          "bilinear": false
+        }
+      ],
+      "output": "adaptclient:halo_blur_y",
+      "uniforms": {
+        "HaloBlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec2",
+            "value": [0.0, 1.0]
+          },
+          {
+            "name": "Radius",
+            "type": "float",
+            "value": 4.0
+          },
+          {
+            "name": "DepthEpsilon",
+            "type": "float",
+            "value": 0.0015
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "adaptclient:post/halo_composite",
+      "inputs": [
+        {
+          "sampler_name": "Glow",
+          "target": "adaptclient:halo_blur_y",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Scene",
+          "target": "adaptclient:halo_scene",
+          "bilinear": true
+        }
+      ],
+      "output": "adaptclient:halo_final",
+      "uniforms": {
+        "HaloCompositeConfig": [
+          {
+            "name": "GlowStrength",
+            "type": "float",
+            "value": 0.85
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "minecraft:post/blit",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "adaptclient:halo_final"
+        }
+      ],
+      "uniforms": {
+        "BlitConfig": [
+          {
+            "name": "ColorModulate",
+            "type": "vec4",
+            "value": [1.0, 1.0, 1.0, 1.0]
+          }
+        ]
+      },
+      "output": "minecraft:main"
+    }
+  ]
+}

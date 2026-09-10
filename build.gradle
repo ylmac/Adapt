@@ -1,0 +1,139 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "1.17.14"
+    id 'maven-publish'
+    id 'java'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+repositories {
+    maven { url = file('libs/maven') }
+    maven { url "https://maven.aliyun.com/repository/public" }
+    maven { url "https://maven.aliyun.com/repository/central" }
+    maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
+    mavenCentral()
+    maven { url "https://maven.fabricmc.net/" }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    // Sodium only supplies compile-time types for the two Sodium-specific mixins;
+    // the game instance provides the actual mod at runtime.
+    compileOnly files('libs/sodium-fabric-0.9.1-beta.2+mc26.2.jar')
+
+    // qml4j：直接解包进 mod JAR 根目录（不作为嵌套 JAR）。
+    // 我们的源文件（Item/Renderer/Image/Text/StyleManager/RestoreHelper）也在根目录，
+    // duplicatesStrategy=EXCLUDE 时源集先编译 → 覆盖 qml4j 同名 class。
+    implementation("io.github.timer-err:qml4j-core:0.2.16-patched") {
+        exclude group: 'io.github.humbleui'
+    }
+    include implementation("org.antlr:antlr4-runtime:4.13.2")
+    implementation("org.ow2.asm:asm:9.7")
+    implementation("org.ow2.asm:asm-util:9.7")
+    include implementation("org.mozilla:rhino:1.9.1")
+    include implementation("io.github.humbleui:types:0.2.0")
+    include implementation("io.github.humbleui:skija-shared:${project.skija_version}")
+    // 多平台 skija native：macOS arm64（本机）+ Windows x64（用户要求支持 Windows）
+    include implementation("io.github.humbleui:skija-macos-arm64:${project.skija_version}")
+    include implementation("io.github.humbleui:skija-windows-x64:${project.skija_version}")
+
+    include implementation("com.google.code.gson:gson:2.10.1")
+    include implementation("net.jthink:jaudiotagger:3.0.1")
+    include implementation("com.googlecode.soundlibs:jlayer:1.0.1.4")
+    include implementation("org.jflac:jflac-codec:1.5.2")
+    include implementation("com.google.zxing:core:3.5.3")
+}
+
+loom {
+    splitEnvironmentSourceSets()
+    mods {
+        "adaptclient" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+    mixin {
+        add sourceSets.client, "adapt.refmap.json"
+    }
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.toVersion(project.java_version)
+    targetCompatibility = JavaVersion.toVersion(project.java_version)
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = Integer.parseInt(project.java_version)
+    options.compilerArgs.addAll(['--add-opens', 'java.base/java.lang=ALL-UNNAMED'])
+    options.compilerArgs.addAll(['--add-opens', 'java.base/jdk.internal.loader=ALL-UNNAMED'])
+}
+
+processResources {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+jar {
+    // 把 qml4j JAR 的所有 class 直接解包进 mod JAR 根目录（不再嵌套）。
+    // duplicatesStrategy=EXCLUDE：sourceSet 编译的类（含我们修改的 Item/Renderer
+    // /Image/Text/StyleManager/RestoreHelper）先加入，qml4j JAR 的同名 class
+    // 自动跳过 → 我们的版本生效。
+    from {
+        zipTree(configurations.runtimeClasspath.filter { it.name.startsWith('qml4j-core') }.singleFile)
+    } {
+        exclude 'META-INF/**'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from("LICENSE") {
+        rename { "${it}_${project.archives_base_name}" }
+    }
+}
+
+// ── 构建期 QML 缓存预编译（自动随 build 运行） ────────────────────
+// 编译 QML 源文件 → 字节码缓存到独立目录 build/qml-cache-build →
+// jar 从那里复制进 JAR 的 assets/adaptclient/qml-cache/。
+// 运行时 QmlCacheManager 从 JAR classpath 读取此缓存到内存，
+// 使 QML 加载零磁盘 I/O。
+def qmlCacheDir = file("build/qml-cache-build")
+def qmlSrcDir = file("src/main/resources/assets/adaptclient/qml")
+def qmlAssetsDir = file("src/main/resources/assets")
+
+tasks.register("buildQmlCache", JavaExec) {
+    // 全量重建：旧目录里的缓存与新源码哈希混在一起会让 qml4j 的全局类计数错位
+    // （陈旧子缓存 restoreAll 后新 Main 编译导致 NoClassDefFoundError、根缓存漏写，
+    // 启动时首开仍然回退到 1s 编译）。每次构建前清空输出目录，保证单次编译内自洽。
+    doFirst { delete qmlCacheDir }
+    // 不 dependsOn compileClientJava：Gradle 任务图保证 classes → compileClientJava
+    // 在 jar 之前执行，而 jar dependsOn buildQmlCache，所以 buildQmlCache 运行时
+    // client 类已编译（runtimeClasspath 惰性解析）。
+    jvmArgs += ["-Djava.awt.headless=true"]
+    classpath = sourceSets.client.runtimeClasspath
+    mainClass = "com.ylmac.adapt.ui.QmlCacheBuilder"
+    args = [
+        // QML 源：直接用 src 目录，不依赖 processResources 产物
+        qmlSrcDir.absolutePath,
+        qmlCacheDir.absolutePath,
+        qmlAssetsDir.absolutePath
+    ]
+    ignoreExitValue = true
+    doLast {
+        def cacheFiles = fileTree(qmlCacheDir).matching { include "*.cache" }.files
+        def manifest = new File(qmlCacheDir, "prebuilt-manifest.txt")
+        manifest.text = cacheFiles.collect { it.name }.join("\n")
+        logger.lifecycle("QML cache built: {} files -> {}", cacheFiles.size(), qmlCacheDir)
+    }
+}
+
+tasks.named("jar") {
+    dependsOn tasks.named("buildQmlCache")
+    from(qmlCacheDir) {
+        into "assets/adaptclient/qml-cache"
+    }
+}

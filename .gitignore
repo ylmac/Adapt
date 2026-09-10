@@ -1,0 +1,41 @@
+# ── 构建产物 / 依赖缓存 ──
+build/
+.gradle/
+.gradle_home/
+out/
+*.class
+*.jar
+# 例外：构建必需的本地依赖（build.gradle 的 file('libs/maven') 与 compileOnly files(...)）
+!gradle/wrapper/gradle-wrapper.jar
+!libs/*.jar
+!libs/maven/**/*.jar
+
+# ── IDE ──
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# ── 运行/日志 ──
+run/
+logs/
+*.log
+crash-reports/
+
+# ── macOS ──
+.DS_Store
+._*
+
+# ── 文档（不上传）──
+docs/
+
+# ── 本地工具 / 反编译产物 ──
+tools/
+参考/
+
+# 备份文件
+*.bak
+
+# ── QML 字节码缓存 ──
+*.qmlc

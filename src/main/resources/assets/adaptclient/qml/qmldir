@@ -1,0 +1,34 @@
+AccountPage AccountPage.qml
+BottomNav BottomNav.qml
+CoverImage CoverImage.qml
+FontPickerDialog FontPickerDialog.qml
+HomePage HomePage.qml
+LibraryPage LibraryPage.qml
+LocalPage LocalPage.qml
+ListenTogetherDialog ListenTogetherDialog.qml
+LoginDialog LoginDialog.qml
+LyricOverlay LyricOverlay.qml
+MiniPlayer MiniPlayer.qml
+PlaylistCard PlaylistCard.qml
+PlaylistContextMenu PlaylistContextMenu.qml
+PlaylistDetailPage PlaylistDetailPage.qml
+PlaylistGrid PlaylistGrid.qml
+QueuePage QueuePage.qml
+RecentPage RecentPage.qml
+SearchPage SearchPage.qml
+SettingsPage SettingsPage.qml
+SongContextMenu SongContextMenu.qml
+SongRow SongRow.qml
+VirtualSongList VirtualSongList.qml
+SettingsSectionAppearance SettingsSectionAppearance.qml
+SettingsSectionPlayback SettingsSectionPlayback.qml
+SettingsSectionCustomApi SettingsSectionCustomApi.qml
+SettingsSectionDesktopLyric SettingsSectionDesktopLyric.qml
+SettingsSectionWorldLyric SettingsSectionWorldLyric.qml
+SettingsSectionStorage SettingsSectionStorage.qml
+SettingsSectionLocal SettingsSectionLocal.qml
+SettingsSectionAbout SettingsSectionAbout.qml
+ModernList 1.0 modulelist/ModernList.qml
+ClassicList 1.0 modulelist/ClassicList.qml
+WurstList 1.0 modulelist/WurstList.qml
+CreidaList 1.0 modulelist/CreidaList.qml

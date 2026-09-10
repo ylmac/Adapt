@@ -1,0 +1,32 @@
+{
+  "uwu": {
+    "sounds": [
+      "adaptclient:uwu"
+    ]
+  },
+  "nya": {
+    "sounds": [
+      "adaptclient:nya"
+    ]
+  },
+  "moan1": {
+    "sounds": [
+      "adaptclient:moan1"
+    ]
+  },
+  "moan2": {
+    "sounds": [
+      "adaptclient:moan2"
+    ]
+  },
+  "moan3": {
+    "sounds": [
+      "adaptclient:moan3"
+    ]
+  },
+  "moan4": {
+    "sounds": [
+      "adaptclient:moan4"
+    ]
+  }
+}

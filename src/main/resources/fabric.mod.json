@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "adaptclient",
+  "version": "${version}",
+  "name": "Adapt",
+  "description": "Adapt - 现代辅助性客户端，基于 qml4j + Skija + Material Design 3。",
+  "authors": ["ylmac"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.ylmac.adapt.QplayerModClient"]
+  },
+  "mixins": ["adapt.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "fabric-api": ">=0.153.0",
+    "minecraft": ">=26.2",
+    "java": ">=25"
+  },
+  "jars": [
+    { "file": "META-INF/jars/qml4j-core-0.2.16-patched.jar" },
+    { "file": "META-INF/jars/types-0.2.0.jar" },
+    { "file": "META-INF/jars/skija-shared-0.143.16.jar" },
+    { "file": "META-INF/jars/skija-windows-x64-0.143.16.jar" },
+    { "file": "META-INF/jars/skija-linux-x64-0.143.16.jar" },
+    { "file": "META-INF/jars/skija-macos-x64-0.143.16.jar" },
+    { "file": "META-INF/jars/skija-macos-arm64-0.143.16.jar" }
+  ]
+}
