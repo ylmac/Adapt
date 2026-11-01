@@ -16,7 +16,6 @@ import net.minecraft.network.protocol.game.ServerboundAttackPacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -35,7 +34,6 @@ public class ConnectionEventMixin {
         if (packet instanceof ServerboundMovePlayerPacket
                 || packet instanceof ServerboundKeepAlivePacket
                 || packet instanceof ServerboundPlayerActionPacket
-                || packet instanceof ServerboundSwingPacket
                 || packet instanceof ServerboundUseItemPacket
                 || packet instanceof ServerboundAttackPacket
                 || packet instanceof ServerboundInteractPacket) {

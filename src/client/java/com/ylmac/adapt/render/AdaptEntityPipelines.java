@@ -1,12 +1,12 @@
 package com.ylmac.adapt.render;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.DepthStencilState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.CompareOp;
-import com.mojang.blaze3d.shaders.UniformType;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.DepthStencilState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.CompareOp;
+import com.mojang.renderpearl.api.pipeline.UniformType;
 import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.RenderPipelines;
 
@@ -36,8 +36,8 @@ public final class AdaptEntityPipelines {
             .build();
     /** Shadow receiver: shadow map + sky-occlusion samplers + frame UBO. */
     public static final BindGroupLayout ADAPT_SHADOW_LAYOUT = BindGroupLayout.builder()
-            .withSampler("ShadowMapSampler")
-            .withSampler("SkyOcclusionSampler")
+            .withUniform("ShadowMapSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("SkyOcclusionSampler", UniformType.COMBINED_IMAGE_SAMPLER)
             .withUniform("ShadowFrame", UniformType.UNIFORM_BUFFER)
             .build();
     /** Shadow caster: frame UBO only. */
@@ -234,10 +234,11 @@ public final class AdaptEntityPipelines {
         }
 
         // 颜色目标（blend 函数 + 格式 + 写掩码）；未使用的槽位保持空
-        com.mojang.blaze3d.pipeline.ColorTargetState[] targetStates = original.getColorTargetStates();
-        for (int i = 0; i < targetStates.length; i++) {
-            if (targetStates[i] != null) {
-                builder.withColorTargetState(i, targetStates[i]);
+        var targetStates = original.getColorTargetStates();
+        for (int i = 0; i < targetStates.size(); i++) {
+            var state = targetStates.get(i);
+            if (state != null) {
+                builder.withColorTargetState(i, state);
             } else if (i > 0) {
                 builder.withUnusedColorTargetState(i);
             }
@@ -247,9 +248,10 @@ public final class AdaptEntityPipelines {
         builder.withPolygonMode(original.getPolygonMode());
         builder.withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());
@@ -297,9 +299,10 @@ public final class AdaptEntityPipelines {
                 .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
                 .withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());
@@ -348,9 +351,10 @@ public final class AdaptEntityPipelines {
                 .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
                 .withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());
@@ -380,9 +384,10 @@ public final class AdaptEntityPipelines {
         builder.withPolygonMode(original.getPolygonMode());
         builder.withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());
@@ -426,9 +431,10 @@ public final class AdaptEntityPipelines {
         builder.withPolygonMode(original.getPolygonMode());
         builder.withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());
@@ -443,7 +449,7 @@ public final class AdaptEntityPipelines {
                                             String skipUniform) {
         for (BindGroupLayout layout : original.getBindGroupLayouts()) {
             boolean skip = false;
-            for (BindGroupLayout.UniformDescription uniform : layout.getUniforms()) {
+            for (BindGroupLayout.UniformDescription uniform : layout.uniforms()) {
                 if (skipUniform.equals(uniform.name())) {
                     skip = true;
                     break;
@@ -468,10 +474,11 @@ public final class AdaptEntityPipelines {
 
     /** 复制原管线的颜色目标状态（blend/format/writeMask）。 */
     private static void layoutsFor(RenderPipeline.Builder builder, RenderPipeline original) {
-        com.mojang.blaze3d.pipeline.ColorTargetState[] targetStates = original.getColorTargetStates();
-        for (int i = 0; i < targetStates.length; i++) {
-            if (targetStates[i] != null) {
-                builder.withColorTargetState(i, targetStates[i]);
+        var targetStates = original.getColorTargetStates();
+        for (int i = 0; i < targetStates.size(); i++) {
+            var state = targetStates.get(i);
+            if (state != null) {
+                builder.withColorTargetState(i, state);
             } else if (i > 0) {
                 builder.withUnusedColorTargetState(i);
             }
@@ -536,9 +543,10 @@ public final class AdaptEntityPipelines {
         builder.withPolygonMode(original.getPolygonMode());
         builder.withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());
@@ -582,10 +590,11 @@ public final class AdaptEntityPipelines {
             builder.withBindGroupLayout(layout);
         }
 
-        com.mojang.blaze3d.pipeline.ColorTargetState[] targetStates = original.getColorTargetStates();
-        for (int i = 0; i < targetStates.length; i++) {
-            if (targetStates[i] != null) {
-                builder.withColorTargetState(i, targetStates[i]);
+        var targetStates = original.getColorTargetStates();
+        for (int i = 0; i < targetStates.size(); i++) {
+            var state = targetStates.get(i);
+            if (state != null) {
+                builder.withColorTargetState(i, state);
             } else if (i > 0) {
                 builder.withUnusedColorTargetState(i);
             }
@@ -595,9 +604,10 @@ public final class AdaptEntityPipelines {
         builder.withPolygonMode(original.getPolygonMode());
         builder.withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());
@@ -641,10 +651,11 @@ public final class AdaptEntityPipelines {
             builder.withBindGroupLayout(layout);
         }
 
-        com.mojang.blaze3d.pipeline.ColorTargetState[] targetStates = original.getColorTargetStates();
-        for (int i = 0; i < targetStates.length; i++) {
-            if (targetStates[i] != null) {
-                builder.withColorTargetState(i, targetStates[i]);
+        var targetStates = original.getColorTargetStates();
+        for (int i = 0; i < targetStates.size(); i++) {
+            var state = targetStates.get(i);
+            if (state != null) {
+                builder.withColorTargetState(i, state);
             } else if (i > 0) {
                 builder.withUnusedColorTargetState(i);
             }
@@ -654,9 +665,10 @@ public final class AdaptEntityPipelines {
         builder.withPolygonMode(original.getPolygonMode());
         builder.withCull(original.isCull());
         var formats = original.getVertexFormatBindings();
-        for (int i = 0; i < formats.length; i++) {
-            if (formats[i] != null) {
-                builder.withVertexBinding(i, formats[i]);
+        for (int i = 0; i < formats.size(); i++) {
+            var format = formats.get(i);
+            if (format != null) {
+                builder.withVertexBinding(i, format);
             }
         }
         builder.withPrimitiveTopology(original.getPrimitiveTopology());

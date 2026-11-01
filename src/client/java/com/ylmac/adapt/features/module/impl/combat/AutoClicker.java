@@ -9,7 +9,7 @@ import com.ylmac.adapt.features.event.impl.ClientTickEvent;
 import com.ylmac.adapt.features.module.Category;
 import com.ylmac.adapt.features.module.Module;
 import com.ylmac.adapt.features.module.ModuleRegistry;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;

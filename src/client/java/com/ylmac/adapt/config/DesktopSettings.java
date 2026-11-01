@@ -8,7 +8,7 @@ import com.ylmac.adapt.features.music.lyric.skia.Fonts;
 import com.ylmac.adapt.features.music.lyric.skia.LyricCompositor;
 import com.ylmac.adapt.features.music.lyric.skia.LyricConfig;
 import com.ylmac.adapt.config.store.AppDirs;
-import io.github.timer_err.qml4j.engine.binding.Property;
+import com.ylmac.adapt.bind.Slot;
 
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -21,108 +21,110 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.ylmac.adapt.features.music.PlayerController;
-import com.ylmac.adapt.QplayerModClient;
-import io.github.timer_err.qml4j.runtime.color.StyleManager;
+import com.ylmac.adapt.AdaptClient;
+import com.ylmac.adapt.theme.StyleManager;
 import com.ylmac.adapt.render.WorldColorSampler;
 
 public final class DesktopSettings implements LyricCompositor.SettingsBridge {
 
     // Appearance
     // darkMode: 0=跟随系统 1=浅色 2=深色 3=主题色(surface+primary混合, PixelPlayer风格)
-    public final Property<Number> darkMode = new Property<>(0);
-    public final Property<Boolean> monetEnabled = new Property<>(true);
+    public final Slot<Number> darkMode = new Slot<>(0);
+    public final Slot<Boolean> monetEnabled = new Slot<>(true);
     /** 莫奈取色来源：0=歌曲封面 1=世界背景（默认世界） */
     /**
      * 主题取色来源：0 = 音乐封面（**默认**）、1 = 世界采样。
      * 世界取色只在 Interface 模块的 Debug 打开时才生效（见 WorldColorSampler/CoverSeedSampler）。
      */
-    public final Property<Number> monetSource = new Property<>(0);
+    public final Slot<Number> monetSource = new Slot<>(0);
 
     /**
      * Debug 模式：**详细/危险选项的总开关**（持久化）。
      * 目前包含：取色来源（世界取色，已废弃，仅调试可用）。
      * 真源在这里，InterfaceModule.isDebug() 读它。
      */
-    public final Property<Boolean> debugMode = new Property<>(false);
+    public final Slot<Boolean> debugMode = new Slot<>(false);
     // 已移除 monetTransitionMs（颜色过渡时长）：过渡功能按用户要求关闭，
     // 新种子直接落地，见 WorldColorSampler.consumePendingSeed。旧配置文件里的
     // 这个键会被忽略（applyInt 找不到对应 Property 时不报错）。
-    public final Property<Boolean> resolvedDark = new Property<>(true);
+    public final Slot<Boolean> resolvedDark = new Slot<>(true);
 
     // Audio
-    public final Property<Number> musicVolume = new Property<>(0.8f);
-    public final Property<Boolean> unblockEnabled = new Property<>(true);
-    public final Property<Boolean> mirrorEnabled = new Property<>(true);
+    public final Slot<Number> musicVolume = new Slot<>(0.8f);
+    public final Slot<Boolean> unblockEnabled = new Slot<>(true);
+    public final Slot<Boolean> mirrorEnabled = new Slot<>(true);
     /** 高音质播放：开启后请求网易云歌曲链接使用 exhigh（高音质）音源 */
-    public final Property<Boolean> highQuality = new Property<>(false);
+    public final Slot<Boolean> highQuality = new Slot<>(false);
 
     // Lyrics
-    public final Property<Number> lyricFontSize = new Property<>(28);
-    public final Property<Number> lyricFontWeight = new Property<>(2);
+    public final Slot<Number> lyricFontSize = new Slot<>(28);
+    public final Slot<Number> lyricFontWeight = new Slot<>(2);
     /** 歌词字体：""=内置 PingFang SC，"system"=系统默认字体，否则为已安装字体族名（FontPickerDialog 设置） */
-    public final Property<String> fontSelection = new Property<>("");
+    public final Slot<String> fontSelection = new Slot<>("");
     /** 已安装字体族列表（FontPickerDialog 显示用，启动时枚举一次，不随选择变化） */
-    public final Property<List<String>> availableFontFamilies = new Property<>(Collections.emptyList());
-    public final Property<Number> lyricLineSpacing = new Property<>(200);
-    public final Property<Boolean> lyricSpring = new Property<>(true);
-    public final Property<Boolean> lyricScale = new Property<>(true);
-    public final Property<Boolean> lyricGlow = new Property<>(true);
-    public final Property<Boolean> lyricEdgeBlur = new Property<>(false);
-    public final Property<Boolean> lyricShadow = new Property<>(true);
+    public final Slot<List<String>> availableFontFamilies = new Slot<>(Collections.emptyList());
+    public final Slot<Number> lyricLineSpacing = new Slot<>(200);
+    public final Slot<Boolean> lyricSpring = new Slot<>(true);
+    public final Slot<Boolean> lyricScale = new Slot<>(true);
+    public final Slot<Boolean> lyricGlow = new Slot<>(true);
+    public final Slot<Boolean> lyricEdgeBlur = new Slot<>(false);
+    public final Slot<Boolean> lyricShadow = new Slot<>(true);
     /** 非逐字歌词线性动画：关闭后无逐字时间的行整行一次性点亮 */
-    public final Property<Boolean> lyricLinearAnim = new Property<>(true);
+    public final Slot<Boolean> lyricLinearAnim = new Slot<>(true);
     /** 歌词页进度条样式：wavy=波浪 straight=直线 */
-    public final Property<String> lyricProgressStyle = new Property<>("wavy");
-    public final Property<Boolean> lyricBgStatic = new Property<>(false);
+    public final Slot<String> lyricProgressStyle = new Slot<>("wavy");
+    public final Slot<Boolean> lyricBgStatic = new Slot<>(false);
 
     // ── ClickGUI 毛玻璃外观（积分榜式玻璃的三个可调项）──
     /** 毛玻璃面板投影 */
-    public final Property<Boolean> glassShadow = new Property<>(true);
+    public final Slot<Boolean> glassShadow = new Slot<>(true);
     /** 毛玻璃面板发光（bloom，主题色） */
-    public final Property<Boolean> glassBloom = new Property<>(false);
+    public final Slot<Boolean> glassBloom = new Slot<>(false);
     /** ClickGUI 动态背景：模仿音乐小组件，在玻璃面板底下画封面流体背景 */
-    public final Property<Boolean> guiFluidBg = new Property<>(true);
-    public final Property<Boolean> showRomaji = new Property<>(true);
-    public final Property<Boolean> showTranslation = new Property<>(true);
+    public final Slot<Boolean> guiFluidBg = new Slot<>(true);
+    public final Slot<Boolean> showRomaji = new Slot<>(true);
+    public final Slot<Boolean> showTranslation = new Slot<>(true);
 
     // Cache
-    public final Property<Number> maxCacheSizeMB = new Property<>(500);
+    public final Slot<Number> maxCacheSizeMB = new Slot<>(500);
     /** 构建期预置 QML 缓存预加载到内存（打开后 QML 加载零磁盘 I/O） */
-    public final Property<Boolean> qmlCachePreload = new Property<>(true);
+    public final Slot<Boolean> qmlCachePreload = new Slot<>(true);
 
     // Storage
-    public final Property<String> musicFolder = new Property<>("");
-    public final Property<String> cacheFolder = new Property<>("");
+    public final Slot<String> musicFolder = new Slot<>("");
+    public final Slot<String> cacheFolder = new Slot<>("");
 
     // 自定义 API 音源（第三方音乐 API 适配）：QML 直接绑定到
     // settings.customApiConfig.<字段> 的嵌套字段；字段级编辑不触发 Property
     // 通知（qml4j 对普通字段走反射直写），由 QML 侧在编辑后调用
     // saveCustomApiConfig() 持久化；PlayerController 构造时持有同一实例，
     // 字段级编辑实时生效。
-    public final Property<CustomApiConfig> customApiConfig = new Property<>(new CustomApiConfig());
+    public final Slot<CustomApiConfig> customApiConfig = new Slot<>(new CustomApiConfig());
 
     // Layout
-    public final Property<Number> topInset = new Property<>(0f);
-    public final Property<Number> bottomInset = new Property<>(0f);
+    public final Slot<Number> topInset = new Slot<>(0f);
+    public final Slot<Number> bottomInset = new Slot<>(0f);
     /** 显示导航栏「本地」标签（关闭后隐藏底部/侧栏本地入口） */
-    public final Property<Boolean> showLocalTab = new Property<>(true);
+    public final Slot<Boolean> showLocalTab = new Slot<>(true);
     /**
      * HUD 位置编辑器的布局（JSON：元素 id → [x, y]，GUI 坐标）。
      * 由 {@code HudEditor} 在按 ESC 退出编辑态时写入；模块设置本身不持久化，
      * 所以位置只能存这里。
      */
-    public final Property<String> hudLayout = new Property<>("");
+    public final Slot<String> hudLayout = new Slot<>("");
+    /** HUD 编辑器的 5 个配置档。JSON：档位 → 一份和 hudLayout 一样的布局。 */
+    public final Slot<String> hudProfiles = new Slot<>("");
 
     // Runtime
-    public final Property<Boolean> showLyrics = new Property<>(true);
+    public final Slot<Boolean> showLyrics = new Slot<>(true);
     /** 世界内歌词对齐：0=左 1=中 2=右（默认右对齐，右下角面板观感） */
-    public final Property<Number> worldLyricAlign = new Property<>(2);
+    public final Slot<Number> worldLyricAlign = new Slot<>(2);
     /** 世界内歌词字号（px，独立于桌面歌词，默认 28） */
-    public final Property<Number> worldLyricFontSize = new Property<>(28);
+    public final Slot<Number> worldLyricFontSize = new Slot<>(28);
     /** 世界内歌词字重：0=极细 1=细 2=常规 3=中等（默认 2） */
-    public final Property<Number> worldLyricFontWeight = new Property<>(2);
+    public final Slot<Number> worldLyricFontWeight = new Slot<>(2);
     /** 世界内歌词描边颜色：0=无 1=黑 2=白 3=橙 4=红 5=金渐变（默认无，原版无描边） */
-    public final Property<Number> worldLyricBorderColor = new Property<>(0);
+    public final Slot<Number> worldLyricBorderColor = new Slot<>(0);
 
     private final Path settingsFile;
     private final Gson gson = new Gson();
@@ -138,16 +140,16 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
         // 如果监听器在 load 之后才注册，初始加载的值不会触发监听器 → isDarkTheme 永远是默认值 FALSE
         darkMode.addListener(mode -> {
             int m = mode == null ? 0 : mode.intValue();
-            resolvedDark.set(m != 1);
+            boolean dark = resolveDarkMode(m);
+            resolvedDark.set(dark);
             // darkMode=3 (主题色) → StyleManager 启用 themedSurface
             // → scheme 的 surface/background 全部替换为 primary 混合 → 所有 QML 自动跟随
             try {
-                Object sm = io.github.timer_err.qml4j.runtime.color.StyleManager.__instance();
+                Object sm = com.ylmac.adapt.theme.StyleManager.__instance();
                 // 必须在 Java 层设置 isDarkTheme——QML Binding 太晚（QML 加载后才触发）
-                // 初始进游戏时 isDarkTheme=FALSE（默认），导致无论选什么都是浅色/黑色
-                ((io.github.timer_err.qml4j.runtime.color.StyleManager) sm)
-                    .isDarkTheme.set(resolvedDark.peek());
-                ((io.github.timer_err.qml4j.runtime.color.StyleManager) sm)
+                ((com.ylmac.adapt.theme.StyleManager) sm)
+                    .isDarkTheme.set(dark);
+                ((com.ylmac.adapt.theme.StyleManager) sm)
                     .setThemedSurface(m == 3);
             } catch (Throwable ignored) {}
             autoSave();
@@ -198,6 +200,7 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
         addAutoSave(fontSelection);
         addAutoSave(showLocalTab);
         addAutoSave(hudLayout);
+        addAutoSave(hudProfiles);
         addAutoSave(customApiConfig);
 
         // 已安装字体族列表（字体选择对话框用）：FontMgr 未就绪（QML 构建期）时静默为空
@@ -226,7 +229,7 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
         showTranslation.addListener(v -> { LyricConfig.instance.showTranslation.setValue(v); });
     }
 
-    private void addAutoSave(Property<?> prop) {
+    private void addAutoSave(Slot<?> prop) {
         prop.addListener(v -> autoSave());
     }
 
@@ -281,11 +284,12 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
             put(map, "fontSelection", fontSelection.get());
             put(map, "showLocalTab", showLocalTab.get());
             put(map, "hudLayout", hudLayout.get());
+            put(map, "hudProfiles", hudProfiles.get());
             put(map, "customApiConfig", customApiConfig.get());
             Files.createDirectories(settingsFile.getParent());
             Files.write(settingsFile, gson.toJson(map).getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[DesktopSettings] save failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[DesktopSettings] save failed: {}", e.getMessage());
         }
     }
 
@@ -334,38 +338,39 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
             applyString(map, "fontSelection", fontSelection);
             applyBool(map, "showLocalTab", showLocalTab);
             applyString(map, "hudLayout", hudLayout);
+            applyString(map, "hudProfiles", hudProfiles);
             Object cfgObj = map.get("customApiConfig");
             if (cfgObj instanceof Map && !((Map<?, ?>) cfgObj).isEmpty()) {
                 CustomApiConfig cfg = gson.fromJson(gson.toJson(cfgObj), CustomApiConfig.class);
                 if (cfg != null) customApiConfig.set(cfg);
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[DesktopSettings] load failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[DesktopSettings] load failed: {}", e.getMessage());
         }
     }
 
-    private static void applyInt(Map<String, Object> map, String key, Property<Number> prop) {
+    private static void applyInt(Map<String, Object> map, String key, Slot<Number> prop) {
         if (map.containsKey(key)) {
             Number val = map.get(key) instanceof Number ? (Number) map.get(key) : null;
             if (val != null) prop.set(val.intValue());
         }
     }
 
-    private static void applyFloat(Map<String, Object> map, String key, Property<Number> prop) {
+    private static void applyFloat(Map<String, Object> map, String key, Slot<Number> prop) {
         if (map.containsKey(key)) {
             Number val = map.get(key) instanceof Number ? (Number) map.get(key) : null;
             if (val != null) prop.set(val.floatValue());
         }
     }
 
-    private static void applyBool(Map<String, Object> map, String key, Property<Boolean> prop) {
+    private static void applyBool(Map<String, Object> map, String key, Slot<Boolean> prop) {
         if (map.containsKey(key)) {
             Boolean val = map.get(key) instanceof Boolean ? (Boolean) map.get(key) : null;
             if (val != null) prop.set(val);
         }
     }
 
-    private static void applyString(Map<String, Object> map, String key, Property<String> prop) {
+    private static void applyString(Map<String, Object> map, String key, Slot<String> prop) {
         if (map.containsKey(key)) {
             String val = map.get(key) instanceof String ? (String) map.get(key) : null;
             if (val != null) prop.set(val);
@@ -410,9 +415,28 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
     public boolean resolvedDark() {
         Number m = darkMode.get();
         int v = m == null ? 0 : m.intValue();
-        // 0 currently falls back to dark, 1 is light, 2 is dark, 3 is themed dark.
-        // Keep this getter consistent with the listener that updates StyleManager.
-        return v != 1;
+        return resolveDarkMode(v);
+    }
+
+    /** 0=跟随系统 1=浅色 2=深色 3=主题色(深色表面+主色)。 */
+    private static boolean resolveDarkMode(int mode) {
+        if (mode == 1) return false;
+        if (mode == 2 || mode == 3) return true;
+        // 跟随系统：读得到的平台信号；否则默认深色（游戏 UI 语境）
+        try {
+            String appearance = System.getProperty("apple.awt.application.appearance", "");
+            if ("light".equalsIgnoreCase(appearance)) return false;
+            if ("dark".equalsIgnoreCase(appearance)) return true;
+        } catch (Throwable ignored) {
+        }
+        try {
+            // Windows/Linux：部分 JVM 暴露的桌面提示
+            Object hint = java.awt.Toolkit.getDefaultToolkit()
+                    .getDesktopProperty("win.xpstyle.colorName");
+            if (hint != null && hint.toString().toLowerCase().contains("light")) return false;
+        } catch (Throwable ignored) {
+        }
+        return true;
     }
     public float musicVolume() { return musicVolume.get() == null ? 0.8f : musicVolume.get().floatValue(); }
     public void setMusicVolume(float v) { musicVolume.set(v); }

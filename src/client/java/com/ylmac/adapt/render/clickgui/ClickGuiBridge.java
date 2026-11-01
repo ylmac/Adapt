@@ -9,7 +9,7 @@ import com.ylmac.adapt.features.module.settings.impl.ColorSetting;
 import com.ylmac.adapt.features.module.settings.impl.DoubleSetting;
 import com.ylmac.adapt.features.module.settings.impl.EnumSetting;
 import com.ylmac.adapt.features.module.settings.impl.IntSetting;
-import com.ylmac.adapt.render.QplayerScreen;
+import com.ylmac.adapt.render.AdaptScreen;
 import com.ylmac.adapt.render.WorldColorSampler;
 import net.minecraft.client.Minecraft;
 
@@ -274,7 +274,7 @@ public class ClickGuiBridge {
                 try {
                     action.run();
                 } catch (Throwable t) {
-                    com.ylmac.adapt.QplayerModClient.LOGGER.warn(
+                    com.ylmac.adapt.AdaptClient.LOGGER.warn(
                             "[ClickGui] button '{}' action failed: {}", s.getName(), t.toString());
                 }
             }
@@ -312,7 +312,7 @@ public class ClickGuiBridge {
 
     /**
      * 打开音乐播放器（兼容入口）：toggle 真实"音乐播放器"模块
-     * （MusicPlayerModule.onEnable 打开 QplayerScreen）。
+     * （MusicPlayerModule.onEnable 打开 AdaptScreen）。
      */
     public void openMusicPlayer() {
         WorldColorSampler.get().forceSnapshot();

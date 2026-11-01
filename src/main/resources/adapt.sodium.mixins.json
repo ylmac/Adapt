@@ -1,0 +1,16 @@
+{
+  "required": false,
+  "package": "com.ylmac.adapt.injection.mixins",
+  "compatibilityLevel": "JAVA_25",
+  "refmap": "adapt.refmap.json",
+  "client": [
+    "SodiumTerrainUniformMixin",
+    "SodiumTerrainTargetMixin",
+    "SodiumAoDisableMixin",
+    "SodiumEmptyLightBakeMixin",
+    "SodiumBlockLightCaptureMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

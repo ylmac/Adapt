@@ -1,13 +1,13 @@
 package com.ylmac.adapt.render;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.module.ModuleRegistry;
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.Image;
 import io.github.humbleui.skija.Paint;
 import io.github.humbleui.types.RRect;
 import io.github.humbleui.types.Rect;
-import io.github.timer_err.qml4j.runtime.color.StyleManager;
+import com.ylmac.adapt.theme.StyleManager;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.DeltaTracker;
@@ -73,9 +73,10 @@ public final class ModuleListOverlay implements HudElement {
     private final Paint paint = new Paint();
 
     private Image wurstLogo;
-
-    /** 左上角 logo 文字（默认 Pixel；由"设置"栏目的 Interface 模块 StringSetting 控制） */
-    private volatile String logoText = "Pixel";
+    private boolean assetsReady;
+    /** BLOOM 的模糊核是常数 σ=7，按帧新建再 close 只是在反复建同一个 SkImageFilter。 */
+    private io.github.humbleui.skija.ImageFilter bloomFilter;
+    private Paint bloomPaint;
 
     /** Rise ArrayListEntry */
     private static final class Entry {
@@ -110,8 +111,6 @@ public final class ModuleListOverlay implements HudElement {
     public int classicColorMode = 1;
     /** 列表背景（Rise BackGroundModeValue: 0=Off 1=Normal）—— Normal = 磨砂玻璃底 */
     public int backgroundMode = 1;
-    /** 模糊半径（Rise Interface.blurRadius，默认 12、范围 1..30） */
-    public int blurRadius = 12;
     /**
      * 背景不透明度（Rise Interface.backgroundAlpha，默认 110）。
      * <p>
@@ -137,9 +136,13 @@ public final class ModuleListOverlay implements HudElement {
 
     public void setOverlayVisible(boolean visible) { this.overlayVisible = visible; }
 
-    /** 设置左上角 logo 文字（Interface 模块 StringSetting 调用） */
-    public void setLogoText(String text) { this.logoText = (text == null || text.isBlank()) ? "Pixel" : text; }
-    public String getLogoText() { return logoText; }
+    /** Modern 的玻璃 “a” 每帧都要世界颜色。Creida 只有磨砂底开着才采。 */
+    public static boolean wantsBackdrop() {
+        ModuleListOverlay overlay = get();
+        if (!overlay.overlayVisible) return false;
+        if (overlay.mode == Mode.MODERN) return true;
+        return overlay.backgroundMode == 1 && overlay.mode == Mode.CREIDA;
+    }
 
     private ModuleListOverlay() {}
     public static ModuleListOverlay get() {
@@ -258,13 +261,21 @@ public final class ModuleListOverlay implements HudElement {
     public void extractRenderState(GuiGraphicsExtractor g, DeltaTracker dt) {
         // 模块列表可见性由真实"模块列表"模块（InterfaceModule）控制
         if (!overlayVisible) return;
+        Probe.begin("hud.moduleList");
+        try {
+            extractModuleList(g, dt);
+        } finally {
+            Probe.end("hud.moduleList");
+        }
+    }
+
+    private void extractModuleList(GuiGraphicsExtractor g, DeltaTracker dt) {
         // 始终渲染 HUD（含 ClickGUI 等 Screen 打开时）—— Rise 的 HUD 在 GUI 里也显示；
         // 之前"GUI 打开跳过"是旧修复，导致设置界面里看不到列表/光晕（用户要求移除）。
         if (Minecraft.getInstance().gui.screen() != null) {
             lastFrameTime = 0;  // GUI 期间不推进动画；关闭后首帧 elapsed=16 平滑过渡
         }
-        ensureSurface();
-        if (surf == null) return;
+        ensureAssets();
 
         try {
             Minecraft mc = Minecraft.getInstance();
@@ -284,10 +295,16 @@ public final class ModuleListOverlay implements HudElement {
             //   贴图 1:1，抗锯齿边缘不会被二次重采样）。原来固定 2× 在大窗口下
             //   只有屏幕的 ~0.6 倍（放大发虚），小窗口下又白超采样。
             float deviceScale = sc * mc.getWindow().getGuiScale();
-            if (surf == null) {
-                surf = new MinecraftSurfaceBackend("module_list", DESIGN_W, effH, deviceScale);
-            } else if (surf.width() != DESIGN_W || surf.height() != effH) {
-                surf.dispose();
+            // 物理像素不超过帧缓冲。比屏幕更大的纹理 blit 时会被缩小，多出来的像素看不见。
+            int fbW = mc.getWindow().getWidth();
+            int fbH = mc.getWindow().getHeight();
+            int wantW = Math.max(1, Math.round(DESIGN_W * deviceScale));
+            int wantH = Math.max(1, Math.round(effH * deviceScale));
+            if (fbW > 0 && fbH > 0 && (wantW > fbW || wantH > fbH)) {
+                deviceScale *= Math.min(fbW / (float) wantW, fbH / (float) wantH);
+            }
+            if (surf == null || surf.width() != DESIGN_W || surf.height() != effH) {
+                if (surf != null) surf.dispose();
                 surf = new MinecraftSurfaceBackend("module_list", DESIGN_W, effH, deviceScale);
             } else {
                 surf.ensureDeviceScale(deviceScale);
@@ -306,11 +323,10 @@ public final class ModuleListOverlay implements HudElement {
             //   模糊之后 QML 的模糊失效"（用户实测）。
             frameBackdrop = null;
             if (backgroundMode == 1 && (mode == Mode.MODERN || mode == Mode.CREIDA)) {
-                // Rise: radius 12 + compression 3 → 约 ±36px 扩散 ≈ σ12 → 本接口的半径 ×2
-                frameBackdrop = BackdropBlurCapture.getBlurredImage(blurRadius * 2f);
+                frameBackdrop = BackdropBlurCapture.getBlurredImage();
                 if (frameBackdrop == null && !loggedBlurUnavailable) {
                     loggedBlurUnavailable = true;
-                    QplayerModClient.LOGGER.warn(
+                    AdaptClient.LOGGER.warn(
                             "[ModuleList] backdrop blur unavailable (capture/GPU wrap failed)");
                 }
             }
@@ -328,7 +344,7 @@ public final class ModuleListOverlay implements HudElement {
 
             long t1 = System.nanoTime();
             if ((t1 - t0) > 8_000_000L) {  // >8ms 记录（临时性能日志）
-                QplayerModClient.LOGGER.warn("[ModuleList] frame {}ms", (t1 - t0) / 1_000_000.0);
+                AdaptClient.LOGGER.warn("[ModuleList] frame {}ms", (t1 - t0) / 1_000_000.0);
             }
 
             int texW = surf.getDisplayWidth();
@@ -346,12 +362,14 @@ public final class ModuleListOverlay implements HudElement {
                     0, 0, 0f, 0f, DESIGN_W, effH, texW, texH, texW, texH);
             pose.popMatrix();
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[ModuleList] render error: {}", t.toString(), t);
+            AdaptClient.LOGGER.warn("[ModuleList] render error: {}", t.toString(), t);
         }
     }
 
-    private void ensureSurface() {
-        if (surf != null) return;
+    /** 只加载字体/logo。表面放到知道设计尺寸和设备倍率之后再建，避免先按 GUI scale 撑出一块比屏幕还大的纹理再扔掉。 */
+    private void ensureAssets() {
+        if (assetsReady) return;
+        assetsReady = true;
         try {
             SkijaNativeFix.preload();
             byte[] logoBytes = loadFont("fonts/wurst.png");
@@ -359,15 +377,18 @@ public final class ModuleListOverlay implements HudElement {
                 try { wurstLogo = Image.makeFromEncoded(logoBytes); }
                 catch (Throwable ignored) {}
             }
-            // 初始倍率先用窗口 GUI scale，渲染时按原生设备倍率 ensureDeviceScale 对齐
-            surf = new MinecraftSurfaceBackend("module_list", 854, 480,
-                    (float) Minecraft.getInstance().getWindow().getGuiScale());
-            surfGs = surf.getGuiScale();
-            QplayerModClient.LOGGER.info("[ModuleList] surface ready");
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[ModuleList] init failed: {}", t.toString());
-            surf = null;
+            AdaptClient.LOGGER.warn("[ModuleList] init failed: {}", t.toString());
         }
+    }
+
+    private Paint bloomLayerPaint() {
+        if (bloomPaint == null) {
+            bloomFilter = io.github.humbleui.skija.ImageFilter.makeBlur(
+                    7f, 7f, io.github.humbleui.skija.FilterTileMode.DECAL);
+            bloomPaint = new Paint().setImageFilter(bloomFilter);
+        }
+        return bloomPaint;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -536,8 +557,6 @@ public final class ModuleListOverlay implements HudElement {
 
     private void renderModern(Canvas canvas, List<Entry> active, int scrW, int scrH, int[] tc, RiseFont font, float moduleSpacing, int guiW, int guiH) {
         float d2 = 2.0f; // bl=false → d2=2.0
-        // logo 字体（Rise L246: medium36Font；BLOOM L117 + REGULAR 共用）
-        RiseFont font36 = RiseFont.main(36, RiseFont.Weight.MEDIUM);
 
         // ══ BLOOM 队列（Rise L86-108）：内容离屏图层 → 高斯模糊 → 混合回主帧 ══
         // Rise BloomShader：内容画 input FBO → 两遍高斯（bloom.frag）→ blendFunc(SRC_ALPHA,
@@ -566,9 +585,7 @@ public final class ModuleListOverlay implements HudElement {
                 //   makeBlur 默认 CLAMP 走 legacy 分支，fLegacyTileMode!=kDecal 时把模糊输入
                 //   裁剪回 layer 边界再做 clamp tiling —— 文字位图（小且贴边）的光晕被裁没；
                 //   DECAL = 透明边缘正常衰减（Rise 全屏 FBO 的等价语义），光晕完整扩散。
-                io.github.humbleui.skija.ImageFilter blurFilter = io.github.humbleui.skija.ImageFilter.makeBlur(
-                        sigma, sigma, io.github.humbleui.skija.FilterTileMode.DECAL);
-                Paint bloomPaint = new Paint().setImageFilter(blurFilter);
+                Paint bloomPaint = bloomLayerPaint();
                 // ⚠ saveLayer 的 margin 必须 ≥ 3σ（Skia 源码 SkBlurImageFilter.cpp:64-69：
                 //   kernelBounds = 3*sigma 外扩）。blur 需要在内容四周有 3σ 的透明边缘空间，
                 //   否则光晕被 layer surface 边界裁剪。logo 在左上角 (6,6)，若 margin 只有
@@ -579,10 +596,7 @@ public final class ModuleListOverlay implements HudElement {
                 float slX = -margin, slY = -margin;
                 float slR = Math.min(scrW, bloomMaxX + margin), slB = Math.min(scrH, bloomMaxY + margin);
                 canvas.saveLayer(Rect.makeXYWH(slX, slY, slR - slX, slB - slY), bloomPaint);
-                // 内容 = Rise L88-107：彩色渐变 logo（L117 ColorUtil.a(...)）+ 彩色栏（glow）/黑字（shadow）
-                // ⚠ logo 用矢量文字（drawVector）：AWT 位图 drawImageRect 是纹理采样 pass，
-                //   MoltenVK 上 blur filter 对其失效（诊断确认）；矢量走几何路径 blur 生效。
-                drawLogoVector(canvas, logoText, 6, 6, font36, tc);
+                // 玻璃 “a” 不进这层。字本身不发光，叠完再按字形把漫过来的光晕抠掉。
                 // Rise L86-107：BLOOM 队列对**每一条**都画一遍背景栏 ——
                 //   normalBackGround=true 时颜色 = glow ? 行色 : Themes.rE()（黑 190）。
                 //   所以 Shadow 模式下是"每条背后一圈黑色投影"，不是黑字！
@@ -612,10 +626,9 @@ public final class ModuleListOverlay implements HudElement {
                     }
                 }
                 canvas.restore();  // 模糊结果 SRC_OVER 混合回主 canvas（= Rise SRC_ALPHA 混合）
-                bloomPaint.close();
-                blurFilter.close();
+                GlassMark.punchBloom(canvas, surfGs);
             } catch (Throwable t) {
-                QplayerModClient.LOGGER.warn("[ModuleList] bloom render failed: {}", t.toString());
+                AdaptClient.LOGGER.warn("[ModuleList] bloom render failed: {}", t.toString());
             }
         }
 
@@ -682,9 +695,7 @@ public final class ModuleListOverlay implements HudElement {
         reg18.draw(canvas, "XYZ:", 5, f3, 0xFFCCCCCC, paint);
         med18.draw(canvas, coords, 5 + xyzWidth, f3, 0xFFCCCCCC, paint);
 
-        // 左上 logo（Rise L246-255）: ColorUtil.a(medium36Font, Client.b, 6, 6, true)
-        // font36 已在 BLOOM 队列声明（L421），此处复用画清晰层
-        drawLogo(canvas, logoText, 6, 6, font36, tc);
+        GlassMark.draw(canvas, BackdropBlurCapture.getFrameImage(), guiW, guiH, surfGs);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -842,38 +853,13 @@ public final class ModuleListOverlay implements HudElement {
         float gx = offX + dx * sc, gy = dy * sc;
         float gw = dw * sc, gh = dh * sc;
         try {
-            // 模糊图是 1/4 分辨率，放大必须用线性采样（默认 nearest 会出块）
+            // 模糊图是全分辨率，仍用线性采样，面板裁切时不会出硬边。
             canvas.drawImageRect(img,
                     Rect.makeXYWH(gx * imgW / guiW, gy * imgH / guiH,
                             gw * imgW / guiW, gh * imgH / guiH),
                     Rect.makeXYWH(dx, dy, dw, dh),
                     io.github.humbleui.skija.SamplingMode.LINEAR, null, true);
         } catch (Throwable ignored) {
-        }
-    }
-
-    /** Rise ColorUtil.a(Font, String, x, y, shadow) = logo 逐字符渐变
-     *  每字符颜色 = lerp(rA, rB, sin(i*0.095)*0.5+0.5)，间距 = 字符宽 + 0.5 */
-    private void drawLogo(Canvas canvas, String text, float x, float y, RiseFont font, int[] tc) {
-        float f = 0;
-        for (int i = 0; i < text.length(); i++) {
-            String ch = String.valueOf(text.charAt(i));
-            float t = (float)(Math.sin(i * 0.095) * 0.5 + 0.5);
-            int color = lerpColor(tc[0], tc[1], t); // ColorUtil.a(rA, rB, t)
-            font.draw(canvas, ch, x + f, y, color, paint);
-            f += font.getStringWidth(ch) + 0.5f;
-        }
-    }
-
-    /** BLOOM 用的矢量渐变 logo（同 ColorUtil.a 渐变，但走 Skia 矢量几何路径 → blur 生效） */
-    private void drawLogoVector(Canvas canvas, String text, float x, float y, RiseFont font, int[] tc) {
-        float f = 0;
-        for (int i = 0; i < text.length(); i++) {
-            String ch = String.valueOf(text.charAt(i));
-            float t = (float)(Math.sin(i * 0.095) * 0.5 + 0.5);
-            int color = lerpColor(tc[0], tc[1], t); // ColorUtil.a(rA, rB, t)
-            font.drawVector(canvas, ch, x + f, y, color);
-            f += font.getStringWidth(ch) + 0.5f;
         }
     }
 

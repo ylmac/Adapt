@@ -1,6 +1,6 @@
 package com.ylmac.adapt.features.module.impl.render.gui;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.module.Module;
 import com.ylmac.adapt.features.module.ModuleManager;
 import net.fabricmc.loader.api.FabricLoader;
@@ -66,7 +66,7 @@ public final class RiseConfigs {
         try {
             if (m.isEnabled() != on) m.setEnabled(on);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[RiseConfigs] set {} failed: {}", m.getModuleId(), t.toString());
+            AdaptClient.LOGGER.warn("[RiseConfigs] set {} failed: {}", m.getModuleId(), t.toString());
         }
     }
 
@@ -91,7 +91,7 @@ public final class RiseConfigs {
                         .forEach(p -> out.put(p.getFileName().toString().replace(".cfg", ""), p));
             }
         } catch (IOException e) {
-            QplayerModClient.LOGGER.warn("[RiseConfigs] list failed: {}", e.toString());
+            AdaptClient.LOGGER.warn("[RiseConfigs] list failed: {}", e.toString());
         }
         return out;
     }
@@ -114,7 +114,7 @@ public final class RiseConfigs {
             Files.writeString(d.resolve(name + ".cfg"), sb.toString(), StandardCharsets.UTF_8);
             return true;
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[RiseConfigs] save failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[RiseConfigs] save failed: {}", t.toString());
             return false;
         }
     }
@@ -133,7 +133,7 @@ public final class RiseConfigs {
             }
             return true;
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[RiseConfigs] load failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[RiseConfigs] load failed: {}", t.toString());
             return false;
         }
     }

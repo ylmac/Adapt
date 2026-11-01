@@ -30,7 +30,7 @@ import com.ylmac.adapt.features.music.netease.dto.NeteaseUser;
 import com.ylmac.adapt.features.music.netease.dto.TogetherRoom;
 import com.ylmac.adapt.features.music.netease.dto.TogetherSnapshot;
 import com.ylmac.adapt.features.music.unblock.SongUnblocker;
-import io.github.timer_err.qml4j.engine.binding.Property;
+import com.ylmac.adapt.bind.Slot;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -49,7 +49,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import com.ylmac.adapt.config.store.AppDirs;
 import com.ylmac.adapt.render.GpuContextHelper;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.render.WorldColorSampler;
 
 public final class PlayerController {
@@ -61,134 +61,134 @@ public final class PlayerController {
     }
 
     // ---- 播放状态 ----
-    public final Property<Boolean> playing = new Property<>(false);
-    public final Property<String> title = new Property<>("");
-    public final Property<String> artist = new Property<>("");
-    public final Property<String> album = new Property<>("");
-    public final Property<String> coverPath = new Property<>("");
-    public final Property<Long> durationMs = new Property<>(0L);
-    public final Property<Long> positionMs = new Property<>(0L);
+    public final Slot<Boolean> playing = new Slot<>(false);
+    public final Slot<String> title = new Slot<>("");
+    public final Slot<String> artist = new Slot<>("");
+    public final Slot<String> album = new Slot<>("");
+    public final Slot<String> coverPath = new Slot<>("");
+    public final Slot<Long> durationMs = new Slot<>(0L);
+    public final Slot<Long> positionMs = new Slot<>(0L);
     // positionMs 每帧被 pump() 写入（音频进度），但不参与布局——只有
     // text: fmt(player.positionMs) 读它，每秒才变一次文字。
     // 用 setPaintOnly 避免每帧 bump changeVersion → settleLayout 从 60Hz 降到 1Hz。
-    { positionMs.setInterceptor((Property.WriteInterceptor) (p, v) -> {
+    { positionMs.setInterceptor((p, v) -> {
         p.setPaintOnly(v instanceof Number ? ((Number) v).longValue() : 0L);
     }); }
-    public final Property<Boolean> loading = new Property<>(false);
-    public final Property<String> toast = new Property<>("");
-    public final Property<Float> volume = new Property<>(0.8f);
-    public final Property<Integer> playMode = new Property<>(0);
-    public final Property<Integer> index = new Property<>(-1);
-    public final Property<Integer> lyricIndex = new Property<>(-1);
-    public final Property<Boolean> lyricsOpen = new Property<>(false);
-    public final Property<Boolean> queueOpen = new Property<>(false);
-    public final Property<Float> lyricSlide = new Property<>(0f);
+    public final Slot<Boolean> loading = new Slot<>(false);
+    public final Slot<String> toast = new Slot<>("");
+    public final Slot<Float> volume = new Slot<>(0.8f);
+    public final Slot<Integer> playMode = new Slot<>(0);
+    public final Slot<Integer> index = new Slot<>(-1);
+    public final Slot<Integer> lyricIndex = new Slot<>(-1);
+    public final Slot<Boolean> lyricsOpen = new Slot<>(false);
+    public final Slot<Boolean> queueOpen = new Slot<>(false);
+    public final Slot<Float> lyricSlide = new Slot<>(0f);
     // 下拉手势/滑块动画中写 lyricSlide 不 bump changeVersion（否则每帧触发全树重排）。
     // Paint-only set：绑定仍会重算（overlay 的 y/scale/opacity 实时更新），但
     // settleLayout 被跳过，帧率不会因拖拽动画而 drop。
     // 注意 QML 写的是 JS double（Number），不是 Float，所以用 raw WriteInterceptor
     // 避免泛型擦除后 lambda 的 checkcast 把 Double 强转 Float 崩溃。
-    { lyricSlide.setInterceptor((Property.WriteInterceptor) (p, v) -> {
-        ((Property<Float>) p).setPaintOnly(v instanceof Number ? ((Number) v).floatValue() : 0f);
+    { lyricSlide.setInterceptor((p, v) -> {
+        p.setPaintOnly(v instanceof Number ? ((Number) v).floatValue() : 0f);
     }); }
     /** 歌词页下拉手势进行中：宿主 LyricCompositor 暂停自动 lerp lyricSlide，服从 QML 写入 */
-    public final Property<Boolean> lyricDrag = new Property<>(false);
-    public final Property<Boolean> loggedIn = new Property<>(false);
-    public final Property<String> userName = new Property<>("");
-    public final Property<String> userAvatar = new Property<>("");
-    public final Property<String> gpuBackend = new Property<>("");
-    public final Property<Integer> backTick = new Property<>(0);
-    public final Property<Boolean> updateAvailable = new Property<>(false);
-    public final Property<String> updateVersion = new Property<>("");
-    public final Property<String> updateNotes = new Property<>("");
+    public final Slot<Boolean> lyricDrag = new Slot<>(false);
+    public final Slot<Boolean> loggedIn = new Slot<>(false);
+    public final Slot<String> userName = new Slot<>("");
+    public final Slot<String> userAvatar = new Slot<>("");
+    public final Slot<String> gpuBackend = new Slot<>("");
+    public final Slot<Integer> backTick = new Slot<>(0);
+    public final Slot<Boolean> updateAvailable = new Slot<>(false);
+    public final Slot<String> updateVersion = new Slot<>("");
+    public final Slot<String> updateNotes = new Slot<>("");
 
-    public final Property<Double> lyricProgress = new Property<>(0.0);
+    public final Slot<Double> lyricProgress = new Slot<>(0.0);
     /** UI 显示用播放进度（降频更新，每 3 帧 set 一次 → 减少布局触发） */
-    public final Property<Float> displayProgress = new Property<>(0f);
+    public final Slot<Float> displayProgress = new Slot<>(0f);
     // displayProgress 每 3 帧被 pump() 写入（进度条位置），不参与布局——
     // 只有 LinearProgress 的 Canvas onPaint 和 width 绑定读它。
     // 用 setPaintOnly 避免每 3 帧 bump changeVersion → settleLayout 全树重测。
-    { displayProgress.setInterceptor((Property.WriteInterceptor) (p, v) -> {
-        ((Property<Float>) p).setPaintOnly(v instanceof Number ? ((Number) v).floatValue() : 0f);
+    { displayProgress.setInterceptor((p, v) -> {
+        p.setPaintOnly(v instanceof Number ? ((Number) v).floatValue() : 0f);
     }); }
-    public final Property<List<LyricLine>> lyrics = new Property<>(Collections.emptyList());
-    public final Property<Boolean> lyricsCoverOnly = new Property<>(Boolean.TRUE);
-    public final Property<byte[]> coverBytes = new Property<>(null);
-    public final Property<String> coverUrl = new Property<>("");
+    public final Slot<List<LyricLine>> lyrics = new Slot<>(Collections.emptyList());
+    public final Slot<Boolean> lyricsCoverOnly = new Slot<>(Boolean.TRUE);
+    public final Slot<byte[]> coverBytes = new Slot<>(null);
+    public final Slot<String> coverUrl = new Slot<>("");
 
     // ---- 设置页 ----
-    public final Property<Integer> cacheSizeMB = new Property<>(0);
-    public final Property<String> appVersion = new Property<>("1.0.0");
-    public final Property<Boolean> logVisible = new Property<>(false);
-    public final Property<String> logText = new Property<>("");
+    public final Slot<Integer> cacheSizeMB = new Slot<>(0);
+    public final Slot<String> appVersion = new Slot<>("1.0.0");
+    public final Slot<Boolean> logVisible = new Slot<>(false);
+    public final Slot<String> logText = new Slot<>("");
 
     // ---- 歌词偏移 ----
-    public final Property<Boolean> lyricOffsetPanelOpen = new Property<>(false);
-    public final Property<Integer> lyricOffsetMs = new Property<>(0);
+    public final Slot<Boolean> lyricOffsetPanelOpen = new Slot<>(false);
+    public final Slot<Integer> lyricOffsetMs = new Slot<>(0);
 
     // ---- 队列 ----
-    public final Property<List<Map<String, Object>>> queueTracks = new Property<>(Collections.emptyList());
-    public final Property<List<Map<String, Object>>> customPlaylistTracks = new Property<>(Collections.emptyList());
-    public final Property<Boolean> currentLikeable = new Property<>(false);
-    public final Property<Boolean> currentLiked = new Property<>(false);
+    public final Slot<List<Map<String, Object>>> queueTracks = new Slot<>(Collections.emptyList());
+    public final Slot<List<Map<String, Object>>> customPlaylistTracks = new Slot<>(Collections.emptyList());
+    public final Slot<Boolean> currentLikeable = new Slot<>(false);
+    public final Slot<Boolean> currentLiked = new Slot<>(false);
 
     /** 调试：QML 进度条拖拽 press/release 计数（WorldColorSampler 跟踪并打日志） */
-    public final Property<Integer> qmlDragDebug = new Property<>(0);
+    public final Slot<Integer> qmlDragDebug = new Slot<>(0);
 
     // ---- 搜索 ----
-    public final Property<List<String>> searchHistory = new Property<>(Collections.emptyList());
-    public final Property<List<String>> hotSearches = new Property<>(Collections.emptyList());
-    public final Property<List<Map<String, Object>>> searchResults = new Property<>(Collections.emptyList());
-    public final Property<Boolean> searchHasMore = new Property<>(false);
-    public final Property<Boolean> searchLoading = new Property<>(false);
-    public final Property<List<SearchRow>> searchRows = new Property<>(Collections.emptyList());
+    public final Slot<List<String>> searchHistory = new Slot<>(Collections.emptyList());
+    public final Slot<List<String>> hotSearches = new Slot<>(Collections.emptyList());
+    public final Slot<List<Map<String, Object>>> searchResults = new Slot<>(Collections.emptyList());
+    public final Slot<Boolean> searchHasMore = new Slot<>(false);
+    public final Slot<Boolean> searchLoading = new Slot<>(false);
+    public final Slot<List<SearchRow>> searchRows = new Slot<>(Collections.emptyList());
 
     // ---- 缓存管理 ----
-    public final Property<List<Map<String, Object>>> cachedSongs = new Property<>(Collections.emptyList());
-    public final Property<Boolean> playlistOffline = new Property<>(false);
+    public final Slot<List<Map<String, Object>>> cachedSongs = new Slot<>(Collections.emptyList());
+    public final Slot<Boolean> playlistOffline = new Slot<>(false);
 
     // ---- 本地 ----
-    public final Property<List<Map<String, Object>>> tracks = new Property<>(Collections.emptyList());
-    public final Property<Integer> libraryCount = new Property<>(0);
+    public final Slot<List<Map<String, Object>>> tracks = new Slot<>(Collections.emptyList());
+    public final Slot<Integer> libraryCount = new Slot<>(0);
 
     // ---- 主页 ----
-    public final Property<List<Map<String, Object>>> recommendPlaylists = new Property<>(Collections.emptyList());
-    public final Property<List<Map<String, Object>>> recommendations = new Property<>(Collections.emptyList());
+    public final Slot<List<Map<String, Object>>> recommendPlaylists = new Slot<>(Collections.emptyList());
+    public final Slot<List<Map<String, Object>>> recommendations = new Slot<>(Collections.emptyList());
 
     // ---- 收藏/播放列表 ----
-    public final Property<List<Map<String, Object>>> myPlaylists = new Property<>(Collections.emptyList());
-    public final Property<Boolean> playlistLoading = new Property<>(false);
-    public final Property<String> playlistTitle = new Property<>("");
-    public final Property<Boolean> playlistOwned = new Property<>(false);
-    public final Property<Boolean> playlistSubscribed = new Property<>(false);
-    public final Property<Long> openPlaylistId = new Property<>(0L);
-    public final Property<List<Map<String, Object>>> playlistTracks = new Property<>(Collections.emptyList());
+    public final Slot<List<Map<String, Object>>> myPlaylists = new Slot<>(Collections.emptyList());
+    public final Slot<Boolean> playlistLoading = new Slot<>(false);
+    public final Slot<String> playlistTitle = new Slot<>("");
+    public final Slot<Boolean> playlistOwned = new Slot<>(false);
+    public final Slot<Boolean> playlistSubscribed = new Slot<>(false);
+    public final Slot<Long> openPlaylistId = new Slot<>(0L);
+    public final Slot<List<Map<String, Object>>> playlistTracks = new Slot<>(Collections.emptyList());
     /** 心动推荐（智能模式）进行中：详情页按钮显示"推荐中…"并禁用 */
-    public final Property<Boolean> intelligenceLoading = new Property<>(false);
+    public final Slot<Boolean> intelligenceLoading = new Slot<>(false);
 
     // ---- 用户资料 ----
-    public final Property<Integer> userVipType = new Property<>(0);
-    public final Property<Integer> userLevel = new Property<>(0);
-    public final Property<String> userSignature = new Property<>("");
-    public final Property<Integer> playlistCount = new Property<>(0);
-    public final Property<Integer> likedCount = new Property<>(0);
+    public final Slot<Integer> userVipType = new Slot<>(0);
+    public final Slot<Integer> userLevel = new Slot<>(0);
+    public final Slot<String> userSignature = new Slot<>("");
+    public final Slot<Integer> playlistCount = new Slot<>(0);
+    public final Slot<Integer> likedCount = new Slot<>(0);
 
     // ---- 最近 ----
-    public final Property<List<Map<String, Object>>> recentSongs = new Property<>(Collections.emptyList());
+    public final Slot<List<Map<String, Object>>> recentSongs = new Slot<>(Collections.emptyList());
 
     // ---- 登录 ----
     // qml4j 不支持 Java 原生数组的 .length 属性, 用 List<List<Boolean>> 代替 boolean[][]
-    public final Property<List<List<Boolean>>> qrImage = new Property<>(null);
-    public final Property<String> qrKey = new Property<>("");
-    public final Property<Integer> qrStatus = new Property<>(0); // 0=获取中, 801=等待, 802=已扫码, 803=成功, 800=过期
+    public final Slot<List<List<Boolean>>> qrImage = new Slot<>(null);
+    public final Slot<String> qrKey = new Slot<>("");
+    public final Slot<Integer> qrStatus = new Slot<>(0); // 0=获取中, 801=等待, 802=已扫码, 803=成功, 800=过期
 
     // ---- 一起听 ----
-    public final Property<Boolean> listenTogetherInRoom = new Property<>(false);
-    public final Property<Boolean> listenTogetherBusy = new Property<>(false);
-    public final Property<String> listenTogetherRoomId = new Property<>("");
-    public final Property<String> listenTogetherMembers = new Property<>("");
-    public final Property<String> listenTogetherStatusText = new Property<>("");
-    public final Property<String> listenTogetherInvitation = new Property<>("");
+    public final Slot<Boolean> listenTogetherInRoom = new Slot<>(false);
+    public final Slot<Boolean> listenTogetherBusy = new Slot<>(false);
+    public final Slot<String> listenTogetherRoomId = new Slot<>("");
+    public final Slot<String> listenTogetherMembers = new Slot<>("");
+    public final Slot<String> listenTogetherStatusText = new Slot<>("");
+    public final Slot<String> listenTogetherInvitation = new Slot<>("");
 
     // ---- 队列管理 ----
     private final java.util.Set<Long> customPlaylistIds = new java.util.HashSet<>();
@@ -362,7 +362,7 @@ public final class PlayerController {
         // 版本号：fabric.mod.json 里的 ${version} 展开值
         try {
             String v = net.fabricmc.loader.api.FabricLoader.getInstance()
-                    .getModContainer(QplayerModClient.MOD_ID)
+                    .getModContainer(AdaptClient.MOD_ID)
                     .map(m -> m.getMetadata().getVersion().getFriendlyString())
                     .orElse(null);
             if (v != null && !v.isEmpty()) appVersion.set(v);
@@ -403,7 +403,7 @@ public final class PlayerController {
 
         // 监听 musicFolder 变化，自动重新扫描
         settings.musicFolder.addListener(folder -> {
-            QplayerModClient.LOGGER.info("[PlayerController] musicFolder changed: {}", folder);
+            AdaptClient.LOGGER.info("[PlayerController] musicFolder changed: {}", folder);
             scanLocalLibrary(String.valueOf(folder));
         });
 
@@ -488,7 +488,7 @@ public final class PlayerController {
                     appendLog("[netease] 红心歌单加载完成: " + likedIds.size() + " 首");
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] loadLikedSongs failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] loadLikedSongs failed: {}", e.getMessage());
                 return null;
             }
         });
@@ -536,7 +536,7 @@ public final class PlayerController {
                     appendLog("[update] 发现新版本 " + ftag);
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.info("[PlayerController] update check skipped: {}", e.toString());
+                AdaptClient.LOGGER.info("[PlayerController] update check skipped: {}", e.toString());
                 return null;
             }
         });
@@ -557,7 +557,7 @@ public final class PlayerController {
                 Runnable uiTask = task.get();
                 if (uiTask != null) post(uiTask);
             } catch (Throwable e) {
-                QplayerModClient.LOGGER.error("[PlayerController] async error", e);
+                AdaptClient.LOGGER.error("[PlayerController] async error", e);
                 post(() -> toast.set("网络错误: " + e.getMessage()));
             }
         });
@@ -574,7 +574,7 @@ public final class PlayerController {
         Runnable r;
         while ((r = uiQueue.poll()) != null) {
             try { r.run(); } catch (Throwable t) {
-                QplayerModClient.LOGGER.error("[PlayerController] task error", t);
+                AdaptClient.LOGGER.error("[PlayerController] task error", t);
             }
         }
         if (playing.get() && audioBackend != null) {
@@ -631,7 +631,7 @@ public final class PlayerController {
         Track t = queueTrackList.get(i);
         loading.set(true);
         String path = t.playable();
-        QplayerModClient.LOGGER.info("[PlayerController] playTrack: i={} track='{}' source={} http={}",
+        AdaptClient.LOGGER.info("[PlayerController] playTrack: i={} track='{}' source={} http={}",
                 i, t.title, t.source, path != null && path.startsWith("http"));
         // 网易云歌曲的 streamUrl 是 HTTP 地址，音频后端（PcmSource）无法直接播；
         // 播过一次之后 streamUrl 已缓存，必须先转回本地缓存文件路径。
@@ -655,7 +655,7 @@ public final class PlayerController {
         if (path == null || path.isEmpty()) {
             // 网易云歌曲需要先获取 URL
             if (t.source == Track.Source.NETEASE && t.neteaseId > 0) {
-                QplayerModClient.LOGGER.info("[PlayerController] playTrack netease id={} title='{}' loggedIn={}",
+                AdaptClient.LOGGER.info("[PlayerController] playTrack netease id={} title='{}' loggedIn={}",
                         t.neteaseId, t.title, netease.isLoggedIn());
                 async(() -> {
                     try {
@@ -669,7 +669,7 @@ public final class PlayerController {
                             }
                             String alt = SongUnblocker.resolve(t.neteaseId, t.title, t.artist);
                             if (alt != null && !alt.isEmpty()) {
-                                QplayerModClient.LOGGER.info("[PlayerController] unblock resolved id={} url={}",
+                                AdaptClient.LOGGER.info("[PlayerController] unblock resolved id={} url={}",
                                         t.neteaseId, alt.length() > 80 ? alt.substring(0, 80) + "…" : alt);
                                 info = new NeteaseClient.UrlInfo(alt, false);
                                 t.trial = false;
@@ -693,7 +693,7 @@ public final class PlayerController {
                             boolean needsDownload = cachedPath == null;
                             if (needsDownload) {
                                 String urlPreview = info.url.length() > 80 ? info.url.substring(0, 80) + "…" : info.url;
-                                QplayerModClient.LOGGER.info("[PlayerController] downloading netease id={} url={}",
+                                AdaptClient.LOGGER.info("[PlayerController] downloading netease id={} url={}",
                                         t.neteaseId, urlPreview);
                                 if (unblockTag.isEmpty()) {
                                     diskCache.cacheAudio(info.url, t.neteaseId);
@@ -720,14 +720,14 @@ public final class PlayerController {
                                     }
                                     cc.disconnect();
                                     preloadedCover = baos.toByteArray();
-                                    QplayerModClient.LOGGER.info("[PlayerController] preloaded cover {} bytes for id={}",
+                                    AdaptClient.LOGGER.info("[PlayerController] preloaded cover {} bytes for id={}",
                                             preloadedCover.length, t.neteaseId);
                                 } catch (Exception e) {
-                                    QplayerModClient.LOGGER.warn("[PlayerController] preload cover failed for id={}: {}",
+                                    AdaptClient.LOGGER.warn("[PlayerController] preload cover failed for id={}: {}",
                                             t.neteaseId, e.getMessage());
                                 }
                             } else {
-                                QplayerModClient.LOGGER.warn("[PlayerController] t.coverUrl IS NULL for id={} title='{}'",
+                                AdaptClient.LOGGER.warn("[PlayerController] t.coverUrl IS NULL for id={} title='{}'",
                                         t.neteaseId, t.title);
                             }
                             // 加载网易云歌词
@@ -736,13 +736,13 @@ public final class PlayerController {
                                 NeteaseLyric nl = netease.lyric(t.neteaseId);
                                 if (nl != null) {
                                     parsedLyricsTmp = LyricParser.fromNeteaseStrings(nl.yrc, nl.lrc, nl.tlyric, nl.romalrc);
-                                    QplayerModClient.LOGGER.info("[PlayerController] loaded netease lyric for id={} lines={}",
+                                    AdaptClient.LOGGER.info("[PlayerController] loaded netease lyric for id={} lines={}",
                                             t.neteaseId, parsedLyricsTmp.size());
                                 } else {
                                     parsedLyricsTmp = Collections.emptyList();
                                 }
                             } catch (Exception e) {
-                                QplayerModClient.LOGGER.warn("[PlayerController] load netease lyric failed for id={}: {}",
+                                AdaptClient.LOGGER.warn("[PlayerController] load netease lyric failed for id={}: {}",
                                         t.neteaseId, e.getMessage());
                                 parsedLyricsTmp = Collections.emptyList();
                             }
@@ -752,7 +752,7 @@ public final class PlayerController {
                                 final String playPath = cachedPath;
                                 final byte[] cover = preloadedCover;
                                 final String sourceTag = unblockTag;
-                                QplayerModClient.LOGGER.info("[PlayerController] playing cached file {} ({} bytes) for id={}",
+                                AdaptClient.LOGGER.info("[PlayerController] playing cached file {} ({} bytes) for id={}",
                                         playPath, new java.io.File(playPath).length(), t.neteaseId);
                                 post(() -> {
                                     if (reqId != playRequestSeq.get()) return;
@@ -766,11 +766,11 @@ public final class PlayerController {
                                     }
                                     if (cover != null) {
                                         coverBytes.set(cover);
-                                        QplayerModClient.LOGGER.info("[PlayerController] set preloaded cover {} bytes for id={}", cover.length, t.neteaseId);
+                                        AdaptClient.LOGGER.info("[PlayerController] set preloaded cover {} bytes for id={}", cover.length, t.neteaseId);
                                     }
                                     lyrics.set(parsedLyrics);
                                     lyricsCoverOnly.set(parsedLyrics.isEmpty());
-                                    QplayerModClient.LOGGER.info("[PlayerController] audio playing started, volume={}", volume.get());
+                                    AdaptClient.LOGGER.info("[PlayerController] audio playing started, volume={}", volume.get());
                                 });
                             } else {
                                 post(() -> {
@@ -791,7 +791,7 @@ public final class PlayerController {
                             });
                         }
                     } catch (Exception e) {
-                        QplayerModClient.LOGGER.error("[PlayerController] playTrack failed", e);
+                        AdaptClient.LOGGER.error("[PlayerController] playTrack failed", e);
                         post(() -> {
                             if (reqId != playRequestSeq.get()) return;
                             loading.set(false);
@@ -816,16 +816,16 @@ public final class PlayerController {
         if (t.lyricText != null && !t.lyricText.isEmpty()) {
             try {
                 localLyrics = LyricParser.fromString(t.lyricText, t.translationFilePath, t.romajiFilePath);
-                QplayerModClient.LOGGER.info("[PlayerController] loaded local lyric lines={} from embedded/sidecar text", localLyrics.size());
+                AdaptClient.LOGGER.info("[PlayerController] loaded local lyric lines={} from embedded/sidecar text", localLyrics.size());
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] parse local lyric text failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] parse local lyric text failed: {}", e.getMessage());
             }
         } else if (t.lyricFilePath != null) {
             try {
                 localLyrics = LyricParser.parse(t.lyricFilePath, t.translationFilePath, t.romajiFilePath);
-                QplayerModClient.LOGGER.info("[PlayerController] loaded local lyric lines={} from {}", localLyrics.size(), t.lyricFilePath);
+                AdaptClient.LOGGER.info("[PlayerController] loaded local lyric lines={} from {}", localLyrics.size(), t.lyricFilePath);
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] parse local lyric failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] parse local lyric failed: {}", e.getMessage());
             }
         }
         lyrics.set(localLyrics);
@@ -870,14 +870,14 @@ public final class PlayerController {
                 List<LyricLine> lines = LrcParser.parse(lrc);
                 if (lines.isEmpty()) return;
                 diskCache.cacheLocalLyric(lrc.getBytes(java.nio.charset.StandardCharsets.UTF_8), key);
-                QplayerModClient.LOGGER.info("[PlayerController] downloaded local lyric lines={} for '{}'", lines.size(), title);
+                AdaptClient.LOGGER.info("[PlayerController] downloaded local lyric lines={} for '{}'", lines.size(), title);
                 post(() -> {
                     if (index.get() >= queueTrackList.size() || queueTrackList.get(index.get()) != t) return;
                     lyrics.set(lines);
                     lyricsCoverOnly.set(false);
                 });
             } catch (Throwable e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] auto-download lyric failed for '{}': {}", title, e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] auto-download lyric failed for '{}': {}", title, e.getMessage());
             }
         });
     }
@@ -933,7 +933,7 @@ public final class PlayerController {
                     if (cov != null) coverBytes.set(cov);
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] loadNeteaseMetaAsync failed for id={}: {}", id, e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] loadNeteaseMetaAsync failed for id={}: {}", id, e.getMessage());
                 return null;
             }
         });
@@ -952,13 +952,13 @@ public final class PlayerController {
                     if (index.get() < 0 || index.get() >= queueTrackList.size()
                             || queueTrackList.get(index.get()) != t) return;
                     if (fUrl == null) {
-                        QplayerModClient.LOGGER.warn("[PlayerController] custom-api song {} has no url", id);
+                        AdaptClient.LOGGER.warn("[PlayerController] custom-api song {} has no url", id);
                         loading.set(false);
                         toast.set("自定义源解析失败");
                         return;
                     }
                     t.streamUrl = fUrl;
-                    QplayerModClient.LOGGER.info("[PlayerController] play custom-api: {} — {}",
+                    AdaptClient.LOGGER.info("[PlayerController] play custom-api: {} — {}",
                             t.title, fUrl.length() > 80 ? fUrl.substring(0, 80) + "…" : fUrl);
                     playBackend(fUrl, 0);
                     playing.set(true);
@@ -967,7 +967,7 @@ public final class PlayerController {
                     loadCustomLyrics(t);
                 });
             } catch (Throwable e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] custom resolve failed for {}: {}", id, e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] custom resolve failed for {}: {}", id, e.getMessage());
                 post(() -> {
                     if (index.get() >= 0 && index.get() < queueTrackList.size()
                             && queueTrackList.get(index.get()) == t) {
@@ -1006,7 +1006,7 @@ public final class PlayerController {
                     if (!ly.isEmpty()) customLyricMem.put(id, ly);
                 }
             } catch (Throwable e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] custom lyric fetch failed for {}: {}", id, e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] custom lyric fetch failed for {}: {}", id, e.getMessage());
             }
             final List<LyricLine> lines = ly;
             post(() -> {
@@ -1048,9 +1048,9 @@ public final class PlayerController {
             try {
                 byte[] data = java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(t.coverLocalPath));
                 coverBytes.set(data);
-                QplayerModClient.LOGGER.info("[PlayerController] loaded local cover {} bytes from {}", data.length, t.coverLocalPath);
+                AdaptClient.LOGGER.info("[PlayerController] loaded local cover {} bytes from {}", data.length, t.coverLocalPath);
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] failed to read coverLocalPath {}: {}", t.coverLocalPath, e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] failed to read coverLocalPath {}: {}", t.coverLocalPath, e.getMessage());
             }
             coverPath.set(t.coverLocalPath);
         } else if (t.coverThumbPath != null && !t.coverThumbPath.startsWith("http")) {
@@ -1083,7 +1083,7 @@ public final class PlayerController {
         } else {
             nextIdx = (index.get() + 1) % queueTrackList.size();
         }
-        QplayerModClient.LOGGER.info("[PlayerController] next: idx={} nextIdx={} queueSize={} mode={}",
+        AdaptClient.LOGGER.info("[PlayerController] next: idx={} nextIdx={} queueSize={} mode={}",
                 index.get(), nextIdx, queueTrackList.size(), mode);
         playTrack(nextIdx);
     }
@@ -1091,7 +1091,7 @@ public final class PlayerController {
     public void prev() {
         if (queueTrackList.isEmpty()) return;
         int prevIdx = (index.get() - 1 + queueTrackList.size()) % queueTrackList.size();
-        QplayerModClient.LOGGER.info("[PlayerController] prev: idx={} prevIdx={} queueSize={}",
+        AdaptClient.LOGGER.info("[PlayerController] prev: idx={} prevIdx={} queueSize={}",
                 index.get(), prevIdx, queueTrackList.size());
         playTrack(prevIdx);
     }
@@ -1119,7 +1119,7 @@ public final class PlayerController {
     public void setPlayMode(int mode) { playMode.set(mode); }
     public void setQueueOpen(boolean open) { queueOpen.set(open); }
     public void setLyricsOpen(boolean open) {
-        QplayerModClient.LOGGER.info("[PlayerController] setLyricsOpen({})", open);
+        AdaptClient.LOGGER.info("[PlayerController] setLyricsOpen({})", open);
         lyricsOpen.set(open);
     }
 
@@ -1182,7 +1182,7 @@ public final class PlayerController {
                 }
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] loadLyricOffsets failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] loadLyricOffsets failed: {}", e.getMessage());
         }
     }
 
@@ -1192,7 +1192,7 @@ public final class PlayerController {
             java.nio.file.Files.createDirectories(f.getParent());
             java.nio.file.Files.write(f, gson.toJson(lyricOffsets).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] saveLyricOffsets failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] saveLyricOffsets failed: {}", e.getMessage());
         }
     }
 
@@ -1320,7 +1320,7 @@ public final class PlayerController {
             java.nio.file.Files.createDirectories(f.getParent());
             java.nio.file.Files.write(f, gson.toJson(state).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] saveQueue failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] saveQueue failed: {}", e.getMessage());
         }
     }
 
@@ -1359,7 +1359,7 @@ public final class PlayerController {
                 });
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] loadQueue failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] loadQueue failed: {}", e.getMessage());
         }
     }
 
@@ -1373,7 +1373,7 @@ public final class PlayerController {
             java.nio.file.Files.createDirectories(f.getParent());
             java.nio.file.Files.write(f, gson.toJson(state).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] saveCustomPlaylist failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] saveCustomPlaylist failed: {}", e.getMessage());
         }
     }
 
@@ -1401,7 +1401,7 @@ public final class PlayerController {
             }
             updateCustomPlaylistTracks();
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] loadCustomPlaylist failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] loadCustomPlaylist failed: {}", e.getMessage());
         }
     }
 
@@ -1411,7 +1411,7 @@ public final class PlayerController {
             java.nio.file.Files.createDirectories(f.getParent());
             java.nio.file.Files.write(f, gson.toJson(searchHistory.get()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] saveSearchHistory failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] saveSearchHistory failed: {}", e.getMessage());
         }
     }
 
@@ -1424,7 +1424,7 @@ public final class PlayerController {
                     new TypeToken<List<String>>() {}.getType());
             if (hist != null) searchHistory.set(hist);
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] loadSearchHistory failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] loadSearchHistory failed: {}", e.getMessage());
         }
     }
 
@@ -1554,11 +1554,11 @@ public final class PlayerController {
 
     private void scanLocalLibrary(String folder) {
         if (folder == null || folder.isEmpty()) {
-            QplayerModClient.LOGGER.warn("[PlayerController] musicFolder is empty, skip scan");
+            AdaptClient.LOGGER.warn("[PlayerController] musicFolder is empty, skip scan");
             return;
         }
         async(() -> {
-            QplayerModClient.LOGGER.info("[PlayerController] scanning local library: {}", folder);
+            AdaptClient.LOGGER.info("[PlayerController] scanning local library: {}", folder);
             List<Track> scanned = libraryScanner.scan(folder);
             return () -> {
                 localTracks.clear();
@@ -1569,7 +1569,7 @@ public final class PlayerController {
                 }
                 tracks.set(out);
                 libraryCount.set(scanned.size());
-                QplayerModClient.LOGGER.info("[PlayerController] local scan done: {} tracks", scanned.size());
+                AdaptClient.LOGGER.info("[PlayerController] local scan done: {} tracks", scanned.size());
             };
         });
     }
@@ -1588,13 +1588,13 @@ public final class PlayerController {
     }
 
     public void openExternalUrl(String url) {
-        QplayerModClient.LOGGER.info("[PlayerController] openExternalUrl: {}", url);
+        AdaptClient.LOGGER.info("[PlayerController] openExternalUrl: {}", url);
         try {
             if (java.awt.Desktop.isDesktopSupported()) {
                 java.awt.Desktop.getDesktop().browse(new URI(url));
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] openExternalUrl failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] openExternalUrl failed: {}", e.getMessage());
         }
     }
 
@@ -1616,7 +1616,7 @@ public final class PlayerController {
     // ==================== 搜索 ====================
 
     public void search(String query) {
-        QplayerModClient.LOGGER.info("[PlayerController] search: {}", query);
+        AdaptClient.LOGGER.info("[PlayerController] search: {}", query);
         if (query == null || query.trim().isEmpty()) return;
         final String q = query.trim();
         final String key = q.toLowerCase(Locale.ROOT);
@@ -1626,7 +1626,7 @@ public final class PlayerController {
         CacheEntry entry = searchCache.get(key);
         if (entry != null && !entry.isExpired()) {
             publishSearchResults(entry.songs, entry.nextOffset, entry.hasMore);
-            QplayerModClient.LOGGER.info("[PlayerController] search cache hit: {}", key);
+            AdaptClient.LOGGER.info("[PlayerController] search cache hit: {}", key);
             return;
         }
         searchPageInFlight = true;
@@ -1658,7 +1658,7 @@ public final class PlayerController {
                     publishSearchResults(r, nextOffset, hasMore);
                 });
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] search failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] search failed: {}", e.getMessage());
                 post(() -> {
                     if (!key.equals(currentSearchKey)) return;
                     searchPageInFlight = false;
@@ -1685,7 +1685,7 @@ public final class PlayerController {
         searchLoading.set(false);
         searchHasMore.set(hasMore);
         rebuildSearchRows();
-        QplayerModClient.LOGGER.info("[PlayerController] search results: {}", songs.size());
+        AdaptClient.LOGGER.info("[PlayerController] search results: {}", songs.size());
     }
 
     public void prepareSearch(String keyword) {
@@ -1760,10 +1760,10 @@ public final class PlayerController {
                     searchLoading.set(false);
                     searchHasMore.set(hasMore);
                     rebuildSearchRows();
-                    QplayerModClient.LOGGER.info("[PlayerController] loadMoreSearch: total={}", baseTracks.size());
+                    AdaptClient.LOGGER.info("[PlayerController] loadMoreSearch: total={}", baseTracks.size());
                 });
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] loadMoreSearch failed at offset {}: {}", offset, e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] loadMoreSearch failed at offset {}: {}", offset, e.getMessage());
                 post(() -> {
                     if (!key.equals(currentSearchKey) || offset != searchNextOffset) return;
                     searchPageInFlight = false;
@@ -1819,7 +1819,7 @@ public final class PlayerController {
                     }
                 });
             } catch (Throwable e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] custom search failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] custom search failed: {}", e.getMessage());
             }
         });
     }
@@ -1922,7 +1922,7 @@ public final class PlayerController {
                 }
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] fillMissingCovers failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] fillMissingCovers failed: {}", e.getMessage());
         }
     }
 
@@ -2033,7 +2033,7 @@ public final class PlayerController {
                 post(() -> toast.set("已开始缓存"));
                 return null;
             } catch (Throwable e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] cache song {} failed: {}", songId, e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] cache song {} failed: {}", songId, e.getMessage());
                 post(() -> toast.set("缓存失败"));
                 return null;
             }
@@ -2090,7 +2090,7 @@ public final class PlayerController {
             for (Track t : out) mapOut.add(trackToMap(t));
             cachedSongs.set(mapOut);
         } catch (Throwable e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] refreshCachedSongs failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] refreshCachedSongs failed: {}", e.getMessage());
         }
     }
 
@@ -2155,10 +2155,10 @@ public final class PlayerController {
                         out.add(playlistToMap(p));
                     }
                     recommendPlaylists.set(out);
-                    QplayerModClient.LOGGER.info("[PlayerController] recommend playlists: {}", pls.size());
+                    AdaptClient.LOGGER.info("[PlayerController] recommend playlists: {}", pls.size());
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] loadRecommendations failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] loadRecommendations failed: {}", e.getMessage());
                 return null;
             }
         });
@@ -2212,7 +2212,7 @@ public final class PlayerController {
                     playlistCount.set(pls.size());
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] loadMyPlaylists failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] loadMyPlaylists failed: {}", e.getMessage());
                 return null;
             }
         });
@@ -2249,7 +2249,7 @@ public final class PlayerController {
                     playlistLoading.set(false);
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] openPlaylist failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] openPlaylist failed: {}", e.getMessage());
                 return () -> {
                     playlistLoading.set(false);
                     toast.set("加载歌单失败: " + e.getMessage());
@@ -2281,7 +2281,7 @@ public final class PlayerController {
                     toast.set("开始播放歌单");
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] playPlaylist failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] playPlaylist failed: {}", e.getMessage());
                 return () -> toast.set("播放歌单失败: " + e.getMessage());
             }
         });
@@ -2335,7 +2335,7 @@ public final class PlayerController {
                     toast.set("已开启心动推荐");
                 };
             } catch (Throwable e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] startIntelligenceMode failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] startIntelligenceMode failed: {}", e.getMessage());
                 return () -> {
                     intelligenceLoading.set(false);
                     toast.set("获取心动推荐失败: " + e.getMessage());
@@ -2424,17 +2424,17 @@ public final class PlayerController {
             try {
                 long uid = neteaseUid > 0 ? neteaseUid : netease.loginUid();
                 if (uid == 0) {
-                    QplayerModClient.LOGGER.warn("[PlayerController] loadRecent: uid is 0");
+                    AdaptClient.LOGGER.warn("[PlayerController] loadRecent: uid is 0");
                     return null;
                 }
                 neteaseUid = uid;
                 // 先试周榜，空则回退到总榜
                 List<NeteaseSong> songList = netease.userRecord(uid, 1);
                 if (songList.isEmpty()) {
-                    QplayerModClient.LOGGER.info("[PlayerController] loadRecent: weekData empty, fallback to allData");
+                    AdaptClient.LOGGER.info("[PlayerController] loadRecent: weekData empty, fallback to allData");
                     songList = netease.userRecord(uid, 0);
                 }
-                QplayerModClient.LOGGER.info("[PlayerController] loadRecent: got {} songs", songList.size());
+                AdaptClient.LOGGER.info("[PlayerController] loadRecent: got {} songs", songList.size());
                 final List<NeteaseSong> songs = songList;
                 return () -> {
                     recentTrackList.clear();
@@ -2447,7 +2447,7 @@ public final class PlayerController {
                     recentSongs.set(out);
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.error("[PlayerController] loadRecent failed", e);
+                AdaptClient.LOGGER.error("[PlayerController] loadRecent failed", e);
                 return () -> toast.set("加载最近播放失败: " + e.getMessage());
             }
         });
@@ -2524,15 +2524,15 @@ public final class PlayerController {
     // ==================== 登录 ====================
 
     public void startQrLogin() {
-        QplayerModClient.LOGGER.info("[PlayerController] startQrLogin called");
+        AdaptClient.LOGGER.info("[PlayerController] startQrLogin called");
         qrStatus.set(0);
         qrImage.set(null);
         async(() -> {
             try {
                 String key = netease.qrLoginKey();
-                QplayerModClient.LOGGER.info("[PlayerController] qrLoginKey={}", key);
+                AdaptClient.LOGGER.info("[PlayerController] qrLoginKey={}", key);
                 boolean[][] matrix = netease.qrMatrix(key);
-                QplayerModClient.LOGGER.info("[PlayerController] qrMatrix result: {}",
+                AdaptClient.LOGGER.info("[PlayerController] qrMatrix result: {}",
                         matrix != null ? matrix.length + "x" + (matrix.length > 0 ? matrix[0].length : 0) : "null");
                 // 转成 List<List<Boolean>> — qml4j 支持 List.size() 但不支持数组 .length
                 List<List<Boolean>> list = null;
@@ -2549,11 +2549,11 @@ public final class PlayerController {
                     qrKey.set(key);
                     qrImage.set(finalList);
                     qrStatus.set(801); // 等待扫码
-                    QplayerModClient.LOGGER.info("[PlayerController] qrImage set, rows={}",
+                    AdaptClient.LOGGER.info("[PlayerController] qrImage set, rows={}",
                             finalList != null ? finalList.size() : 0);
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.error("[PlayerController] startQrLogin failed", e);
+                AdaptClient.LOGGER.error("[PlayerController] startQrLogin failed", e);
                 return () -> {
                     qrStatus.set(800);
                     toast.set("获取二维码失败: " + e.getMessage());
@@ -2570,7 +2570,7 @@ public final class PlayerController {
         async(() -> {
             try {
                 int code = netease.qrLoginCheck(key);
-                QplayerModClient.LOGGER.info("[PlayerController] qrLoginCheck code={}", code);
+                AdaptClient.LOGGER.info("[PlayerController] qrLoginCheck code={}", code);
                 return () -> {
                     qrStatus.set(code);
                     if (code == 803) {
@@ -2582,7 +2582,7 @@ public final class PlayerController {
                     }
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] pollQrLogin failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] pollQrLogin failed: {}", e.getMessage());
                 return null;
             }
         });
@@ -2785,7 +2785,7 @@ public final class PlayerController {
             org.lwjgl.glfw.GLFW.glfwSetClipboardString(h, url);
             toast.set("已复制链接");
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] copyPlaylistLink failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] copyPlaylistLink failed: {}", e.getMessage());
             toast.set("复制失败");
         }
     }
@@ -2823,7 +2823,7 @@ public final class PlayerController {
                     toast.set("一起听房间已创建");
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] createListenTogetherRoom failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] createListenTogetherRoom failed: {}", e.getMessage());
                 return () -> {
                     listenTogetherBusy.set(false);
                     toast.set("创建房间失败: " + e.getMessage());
@@ -2853,7 +2853,7 @@ public final class PlayerController {
                 inviterId = Long.parseLong(idStr);
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] parse invitation failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] parse invitation failed: {}", e.getMessage());
         }
         if (roomId.isEmpty() || inviterId == 0L) {
             listenTogetherBusy.set(false);
@@ -2876,7 +2876,7 @@ public final class PlayerController {
                     toast.set("已加入一起听");
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] joinListenTogether failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] joinListenTogether failed: {}", e.getMessage());
                 return () -> {
                     listenTogetherBusy.set(false);
                     toast.set("加入房间失败: " + e.getMessage());
@@ -2907,7 +2907,7 @@ public final class PlayerController {
                     toast.set("已退出一起听房间");
                 };
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] leaveListenTogether failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] leaveListenTogether failed: {}", e.getMessage());
                 return () -> {
                     listenTogetherBusy.set(false);
                     toast.set("退出房间失败: " + e.getMessage());
@@ -2951,12 +2951,12 @@ public final class PlayerController {
                     // 不回读就会出现"提示已复制但剪贴板是空的"。
                     String readBack = org.lwjgl.glfw.GLFW.glfwGetClipboardString(windowHandle);
                     if (text.equals(readBack)) return true;
-                    QplayerModClient.LOGGER.warn("[PlayerController] GLFW clipboard write not effective, "
+                    AdaptClient.LOGGER.warn("[PlayerController] GLFW clipboard write not effective, "
                             + "read back: {}", readBack == null ? "null" : readBack);
                 }
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[PlayerController] GLFW clipboard failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[PlayerController] GLFW clipboard failed: {}", t.toString());
         }
         try {
             java.awt.Toolkit.getDefaultToolkit()
@@ -2964,7 +2964,7 @@ public final class PlayerController {
                     .setContents(new java.awt.datatransfer.StringSelection(text), null);
             return true;
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[PlayerController] AWT clipboard fallback failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[PlayerController] AWT clipboard fallback failed: {}", t.toString());
             return false;
         }
     }
@@ -2980,7 +2980,7 @@ public final class PlayerController {
             long curPos = positionMs.get() != null ? positionMs.get() : 0L;
             netease.togetherHeartbeat(togetherRoomId, curSongId, Boolean.TRUE.equals(playing.peek()), curPos);
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] together heartbeat error: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] together heartbeat error: {}", e.getMessage());
         }
         // 每 3 秒同步一下本地变更
         long now = System.currentTimeMillis();
@@ -3007,9 +3007,9 @@ public final class PlayerController {
             ids.add(curId);
             try {
                 netease.reportTogetherPlaylist(togetherRoomId, neteaseUid, 1L, ids);
-                QplayerModClient.LOGGER.info("[PlayerController] reported together playlist: {}", curId);
+                AdaptClient.LOGGER.info("[PlayerController] reported together playlist: {}", curId);
             } catch (Exception e) {
-                QplayerModClient.LOGGER.warn("[PlayerController] reportTogetherPlaylist failed: {}", e.getMessage());
+                AdaptClient.LOGGER.warn("[PlayerController] reportTogetherPlaylist failed: {}", e.getMessage());
             }
         }
     }
@@ -3044,7 +3044,7 @@ public final class PlayerController {
                 post(() -> listenTogetherStatusText.set("同步中(" + snap.songIds.size() + "首)"));
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[PlayerController] applyTogetherSnapshot failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("[PlayerController] applyTogetherSnapshot failed: {}", e.getMessage());
         }
     }
 

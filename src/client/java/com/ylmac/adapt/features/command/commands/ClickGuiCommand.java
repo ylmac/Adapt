@@ -1,8 +1,11 @@
 package com.ylmac.adapt.features.command.commands;
 
 import com.ylmac.adapt.features.command.Command;
+import com.ylmac.adapt.features.module.impl.render.InterfaceModule;
 import com.ylmac.adapt.render.clickgui.ClickGuiBridge;
 import com.ylmac.adapt.render.clickgui.ClickGuiScreen;
+import com.ylmac.adapt.render.clickgui.ListClickGuiScreen;
+import com.ylmac.adapt.render.clickgui.RiseClickGuiScreen;
 import com.ylmac.adapt.util.ChatUtil;
 import net.minecraft.client.Minecraft;
 
@@ -37,11 +40,13 @@ public class ClickGuiCommand extends Command {
         String subCommand = args.get(1).toLowerCase(Locale.ROOT);
         switch (subCommand) {
             case "open":
-                if (mc.gui.screen() instanceof ClickGuiScreen) {
+                if (mc.gui.screen() instanceof ClickGuiScreen
+                        || mc.gui.screen() instanceof RiseClickGuiScreen
+                        || mc.gui.screen() instanceof ListClickGuiScreen) {
                     mc.gui.setScreen(null);
                     ChatUtil.sendFormatted(String.format("%sClickGUI &cclosed&r", ChatUtil.CLIENT_NAME));
                 } else {
-                    mc.gui.setScreen(new ClickGuiScreen());
+                    mc.gui.setScreen(InterfaceModule.createClickGui());
                     ChatUtil.sendFormatted(String.format("%sClickGUI &aopened&r", ChatUtil.CLIENT_NAME));
                 }
                 break;

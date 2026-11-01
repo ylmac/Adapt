@@ -11,6 +11,7 @@ import com.ylmac.adapt.features.module.settings.impl.DoubleSetting;
 import com.ylmac.adapt.features.module.settings.impl.IntSetting;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
+import net.minecraft.network.protocol.game.VecDelta;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
@@ -211,10 +212,15 @@ public class LegitReach extends Module {
             // 用 getEntity(level) 反查实体，判空即不是目标实体
             Entity moved = packet.getEntity(mc.level);
             if (moved != targetEntity) return;
-            realTargetPosition = realTargetPosition.add(
-                    packet.getXa() / 4096.0,
-                    packet.getYa() / 4096.0,
-                    packet.getZa() / 4096.0);
+            VecDelta delta = packet.getPositionDelta();
+            if (delta instanceof VecDelta.Linear linear) {
+                realTargetPosition = realTargetPosition.add(
+                        linear.xa() / 4096.0,
+                        linear.ya() / 4096.0,
+                        linear.za() / 4096.0);
+            } else {
+                realTargetPosition = delta.decode(moved.getPositionCodec()).endPosition();
+            }
             lastTrackTick = mc.player.tickCount;
         } else if (event.getPacket() instanceof ClientboundTeleportEntityPacket teleport) {
             if (teleport.id() != targetEntity.getId()) return;

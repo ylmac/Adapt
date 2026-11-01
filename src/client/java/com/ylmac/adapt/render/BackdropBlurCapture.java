@@ -2,25 +2,29 @@ package com.ylmac.adapt.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.vulkan.VulkanGpuTexture;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.backend.vulkan.VulkanGpuTexture;
 import io.github.humbleui.skija.BackendRenderTarget;
+import io.github.humbleui.skija.BlendMode;
+import io.github.humbleui.skija.Canvas;
+import io.github.humbleui.skija.ColorFilter;
+import io.github.humbleui.skija.ColorMatrix;
+import io.github.humbleui.skija.ColorType;
 import io.github.humbleui.skija.DirectContext;
+import io.github.humbleui.skija.FilterTileMode;
 import io.github.humbleui.skija.Image;
 import io.github.humbleui.skija.ImageFilter;
 import io.github.humbleui.skija.ImageInfo;
-import io.github.humbleui.skija.FilterTileMode;
 import io.github.humbleui.skija.Paint;
 import io.github.humbleui.skija.SamplingMode;
 import io.github.humbleui.skija.Surface;
 import io.github.humbleui.skija.SurfaceOrigin;
-import io.github.humbleui.skija.ColorType;
 import io.github.humbleui.types.Rect;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
 /**
  * GPU-only 帧缓冲截取 + 模糊（无 CPU 回读）。
@@ -30,15 +34,11 @@ import com.ylmac.adapt.QplayerModClient;
  * 2. CommandEncoder.copyTextureToTexture → GPU 纹理间复制（不经过 CPU）
  * 3. 包装为 Skija Surface（wrapBackendRenderTarget）
  * 4. makeImageSnapshot → GPU Image
- * 5. 降采样到 1/4 分辨率 + ImageFilter.makeBlur → GPU 高斯模糊
+ * 5. 全分辨率 ImageFilter.makeBlur → GPU 高斯模糊
  *
- * 模糊在 1/4 分辨率执行：填充量约为全分辨率的 1/16，
- * 毛玻璃视觉上无差别（这也是 iOS/主流实现的做法）。
+ * 模糊图和帧缓冲同尺寸。没人会取样的帧不做拷贝。
  */
 public final class BackdropBlurCapture {
-
-    /** 模糊执行分辨率的降采样倍数（4 = 1/4 分辨率） */
-    private static final int BLUR_DOWNSCALE = 4;
 
     /**
      * 每帧缓存：同一帧内所有 HUD 元素（聊天/积分榜/音乐/时钟）共用一份模糊结果。
@@ -58,17 +58,56 @@ public final class BackdropBlurCapture {
 
     private static GpuTexture captureTexture;
     private static int captureW = 0, captureH = 0;
-    /** 复用的小尺寸模糊 Surface（1/4 分辨率） */
+    /**
+     * 世界模糊只有这一档，和 HUD 卡片一致（半径 24 → σ12）。
+     * 界面设置里的 Blur Radius 默认 12，写入时乘 2，还是这一个数。
+     */
+    public static final float CARD_RADIUS = 24f;
+    private static float radius = CARD_RADIUS;
+
+    /** 复用的全分辨率模糊 Surface */
     private static Surface blurSurface;
+    /** 本帧包出来的源图，同一帧里不同半径共用，不再每个半径各包一次。 */
+    private static Image frameSource;
+    private static int frameSourceStamp = -1;
+    /** 高斯滤镜按 sigma 留着。半径来自设置，不会每帧变。 */
+    private static final java.util.HashMap<Integer, ImageFilter> filterCache = new java.util.HashMap<>();
+    /** 把世界缓冲的 alpha 收成 1。天空的 alpha 不是透明度。 */
+    private static ColorFilter opaqueAlpha;
 
     private BackdropBlurCapture() {}
 
     /**
-     * 截取 Minecraft 帧缓冲到 GPU 纹理（无 CPU 回读）。
-     * 在 QML 渲染前调用。
+     * 这一帧有没有人会来取模糊图。采集发生在界面绘制之前，所以按模块和当前界面判断，
+     * 而不是等调用发生。判断失败时照常采集，避免玻璃突然变黑。
      */
+    private static boolean wanted() {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null) return false;
+            var screen = mc.gui != null ? mc.gui.screen() : null;
+            if (screen instanceof com.ylmac.adapt.compose.host.AdaptComposeScreen compose
+                    && compose.wantsBackdropBlur()) {
+                return true;
+            }
+            if (MusicWidgetOverlay.wantsBackdrop()) return true;
+            if (ClockWidgetOverlay.wantsBackdrop()) return true;
+            if (ScoreBoardOverlay.wantsBackdrop()) return true;
+            if (ChatOverlay.wantsBackdrop()) return true;
+            if (ModuleListOverlay.wantsBackdrop()) return true;
+            return false;
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
     public static void captureFrame() {
         frameStamp++;          // 新的一帧 → 缓存的模糊作废
+        closeBlurCache();
+        blurCacheStamp = frameStamp;
+        closeFrameSource();
+        if (!wanted()) return;
+        Probe.begin("blur.capture");
         try {
             Minecraft mc = Minecraft.getInstance();
             if (mc.gameRenderer == null) return;
@@ -83,7 +122,7 @@ public final class BackdropBlurCapture {
 
             // 日志：打印帧缓冲分辨率
             if (w != captureW || h != captureH) {
-                QplayerModClient.LOGGER.info("[QPlayer] BackdropBlurCapture: framebuffer size {}x{}", w, h);
+                AdaptClient.LOGGER.info("[QPlayer] BackdropBlurCapture: framebuffer size {}x{}", w, h);
             }
 
             // 创建/复用目标纹理
@@ -111,21 +150,47 @@ public final class BackdropBlurCapture {
                 ctx.flushAndSubmit(false);
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.error("[QPlayer] BackdropBlurCapture.captureFrame failed: {}", t.toString());
+            AdaptClient.LOGGER.error("[QPlayer] BackdropBlurCapture.captureFrame failed: {}", t.toString());
+            Probe.hit("blur.captureFail");
+        } finally {
+            Probe.end("blur.capture");
         }
     }
 
+    /** 设置里的 Blur Radius 乘 2 写到这里。默认 24，和卡片相同。 */
+    public static void setRadius(float value) {
+        if (value > 0f && value <= 64f) radius = value;
+    }
+
     /**
-     * 获取模糊后的帧缓冲图像（GPU Image，无 CPU 回读）。在渲染线程调用。
-     * <p>
-     * 返回的 Image 由本类持有，**调用方不要 close**；帧边界（下一次
-     * {@link #captureFrame()}）统一在渲染线程释放。
-     * <p>
-     * 按半径分槽缓存：同一帧里积分榜/聊天用 24、QML 界面用 8、模块列表用 2×
-     * 各自设置值 —— 单槽缓存会让后一个请求把前一个还在被绘制的 Image close 掉。
+     * 本帧的世界模糊。调用方不要 close。
+     * 所有界面共用 {@link #radius}，同一帧再取就是同一张图。
      */
-    public static Image getBlurredImage(float blurRadius) {
+    public static Image getBlurredImage() {
+        return blurred(radius);
+    }
+
+    /**
+     * 本帧没模糊的世界颜色。调用方不要 close。
+     * 液态玻璃要自己在字形里做很轻的模糊，不能用卡片那张 σ12。
+     */
+    public static Image getFrameImage() {
         if (captureTexture == null || captureW <= 0 || captureH <= 0) return null;
+        try {
+            DirectContext ctx = GpuContextHelper.getOrCreateContext();
+            if (ctx == null) return null;
+            return sourceForFrame(ctx);
+        } catch (Throwable t) {
+            AdaptClient.LOGGER.warn("[QPlayer] BackdropBlurCapture.getFrameImage failed: {}", t.toString());
+            return null;
+        }
+    }
+
+    private static Image blurred(float blurRadius) {
+        if (captureTexture == null || captureW <= 0 || captureH <= 0) {
+            Probe.hit("blur.missing");
+            return null;
+        }
         // 帧变了 → 上一帧的缓存全部失效（此刻渲染线程安全，显式 close 而不是留给 GC：
         // Skija 的 Cleaner 线程析构 GPU Image 时走 GrVkTexture::onRelease，
         // 和渲染线程的 flushAndSubmit 并发访问 GrResourceCache 就是 SIGTRAP）
@@ -165,90 +230,127 @@ public final class BackdropBlurCapture {
             if (d != null) {
                 java.nio.file.Files.write(dir.resolve("blurred.png"), d.getBytes());
                 d.close();
-                QplayerModClient.LOGGER.info("[QPlayer] blur debug: wrote {} ({}x{})",
+                AdaptClient.LOGGER.info("[QPlayer] blur debug: wrote {} ({}x{})",
                         dir.resolve("blurred.png"), blurred.getWidth(), blurred.getHeight());
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[QPlayer] blur debug dump failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[QPlayer] blur debug dump failed: {}", t.toString());
         }
     }
 
     private static Image buildBlurredImage(float blurRadius) {
-
+        Probe.begin("blur.build");
         try {
             DirectContext ctx = GpuContextHelper.getOrCreateContext();
             if (ctx == null) return null;
-
-            Image snapshot = null;
-            if (captureTexture instanceof VulkanGpuTexture) {
-                // Vulkan 路径：包装 GPU 纹理，零拷贝快照
-                long vkImage = ((VulkanGpuTexture) captureTexture).vkImage();
-                // ⚠ layout 必须是 **GENERAL(1)**，不能是 UNDEFINED(0)：
-                //   MC 的 VulkanCommandEncoder.copyTextureToTexture 直接 vkCmdCopyImage、
-                //   **不做 layout 过渡**，纹理停在 MC 跟踪的布局里。声明 UNDEFINED 会让
-                //   Skia 做 UNDEFINED→其它 的 barrier —— 按 Vulkan 语义**内容作废**，
-                //   于是模糊图全黑/空白（实测：诊断转储 ~/.adapt-blur 根本没生成）。
-                BackendRenderTarget brt = BackendRenderTarget.makeVulkan(
-                        captureW, captureH, vkImage,
-                        0, 1, 37, 0x10 | 0x04 | 0x02 | 0x01, 1, 1);
-                Surface freshSurface = Surface.wrapBackendRenderTarget(
-                        ctx, brt, SurfaceOrigin.BOTTOM_LEFT, ColorType.RGBA_8888, null);
-                if (freshSurface == null) { brt.close(); return null; }
-                snapshot = freshSurface.makeImageSnapshot();
-                freshSurface.close();
-                brt.close();
-            } else if (GpuContextHelper.isGL()) {
-                // OpenGL 路径：通过反射获取 GL 纹理 ID，包装为 GPU Image
-                snapshot = getGlSnapshot(ctx);
-            } else {
-                return null;
-            }
+            Image snapshot = sourceForFrame(ctx);
             if (snapshot == null) return null;
 
-            // ⚠ GPU Image 必须显式 close，绝不能留给 GC：Skija 的 Cleaner 线程析构
-            //   SkImage_Ganesh 时会走 GrVkTexture::onRelease →
-            //   GrResourceCache::notifyARefCntReachedZero，而 Skia 的 GPU 资源缓存不是
-            //   线程安全的，和渲染线程的 flushAndSubmit 并发就是 SIGTRAP 崩溃
-            //   （崩溃报告：Thread 40 "Java: Cleaner-0" ← GrVkTexture::onRelease）。
-            //   drawImageRect 已经把图记录进 op 并持有自己的引用，此处 close 只是
-            //   释放 Java 侧句柄引用，GPU 资源存活到 op 被 flush。
-            try {
-                // 降采样到 1/4 分辨率再做模糊：填充量降到全分辨率模糊的 1/16
-                int blurW = Math.max(16, captureW / BLUR_DOWNSCALE);
-                int blurH = Math.max(16, captureH / BLUR_DOWNSCALE);
-                float sigma = blurRadius / 2.0f / BLUR_DOWNSCALE;
+            int blurW = Math.max(1, captureW);
+            int blurH = Math.max(1, captureH);
+            // 半径 24 → σ12。以前在 1/4 图上用 σ3，放大四倍后观感也是 σ12。
+            float sigma = blurRadius / 2.0f;
 
-                // 复用模糊 Surface
-                if (blurSurface == null || blurW != blurSurface.getWidth() || blurH != blurSurface.getHeight()) {
-                    if (blurSurface != null) blurSurface.close();
-                    ImageInfo info = ImageInfo.makeN32Premul(blurW, blurH);
-                    blurSurface = Surface.makeRenderTarget(ctx, false, info);
-                    if (blurSurface == null) {
-                        blurSurface = null;
-                        return null;
-                    }
+            if (blurSurface == null || blurW != blurSurface.getWidth() || blurH != blurSurface.getHeight()) {
+                if (blurSurface != null) blurSurface.close();
+                ImageInfo info = ImageInfo.makeN32Premul(blurW, blurH);
+                blurSurface = Surface.makeRenderTarget(ctx, false, info);
+                if (blurSurface == null) {
+                    blurSurface = null;
+                    return null;
                 }
+            }
 
-                // 降采样 + 高斯模糊一步完成
-                ImageFilter blurFilter = ImageFilter.makeBlur(sigma, sigma, FilterTileMode.CLAMP);
-                Paint paint = new Paint();
-                paint.setImageFilter(blurFilter);
-                blurSurface.getCanvas().drawImageRect(
-                    snapshot,
-                    Rect.makeXYWH(0, 0, captureW, captureH),
-                    Rect.makeXYWH(0, 0, blurW, blurH),
-                    SamplingMode.LINEAR, paint, false);
-                blurFilter.close();
-                paint.close();
-
+            Canvas blurCanvas = blurSurface.getCanvas();
+            Rect full = Rect.makeXYWH(0, 0, captureW, captureH);
+            // 上一帧的结果还在这张目标上。天空 alpha 往往是 0，模糊结果也不是不透明，
+            // 再叠上去会在天地交界一帧帧加亮，最后变成一条白线。
+            blurCanvas.restoreToCount(1);
+            blurCanvas.clear(0xFF000000);
+            Paint opaquePaint = new Paint();
+            opaquePaint.setBlendMode(BlendMode.SRC);
+            opaquePaint.setColorFilter(opaqueAlpha());
+            blurCanvas.drawImageRect(snapshot, full, full, SamplingMode.LINEAR, opaquePaint, false);
+            opaquePaint.close();
+            Image opaque = blurSurface.makeImageSnapshot();
+            try {
+                blurCanvas.clear(0xFF000000);
+                Paint blurPaint = new Paint();
+                blurPaint.setBlendMode(BlendMode.SRC);
+                blurPaint.setImageFilter(blurFilter(sigma));
+                blurCanvas.drawImageRect(opaque, full, full, SamplingMode.LINEAR, blurPaint, false);
+                blurPaint.close();
                 return blurSurface.makeImageSnapshot();
             } finally {
-                snapshot.close();
+                opaque.close();
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.error("[QPlayer] BackdropBlurCapture.getBlurredImage failed: {}", t.toString());
+            AdaptClient.LOGGER.error("[QPlayer] BackdropBlurCapture.getBlurredImage failed: {}", t.toString());
+            Probe.hit("blur.buildFail");
             return null;
+        } finally {
+            Probe.end("blur.build");
         }
+    }
+
+    private static ColorFilter opaqueAlpha() {
+        if (opaqueAlpha == null) {
+            opaqueAlpha = ColorFilter.makeMatrix(new ColorMatrix(
+                    1, 0, 0, 0, 0,
+                    0, 1, 0, 0, 0,
+                    0, 0, 1, 0, 0,
+                    0, 0, 0, 0, 1));
+        }
+        return opaqueAlpha;
+    }
+
+    private static ImageFilter blurFilter(float sigma) {
+        int key = Math.round(sigma * 100f);
+        ImageFilter cached = filterCache.get(key);
+        if (cached != null) return cached;
+        ImageFilter blur = ImageFilter.makeBlur(sigma, sigma, FilterTileMode.CLAMP);
+        filterCache.put(key, blur);
+        return blur;
+    }
+
+    /**
+     * 本帧的源图。同一帧只包一次，帧边界在 {@link #captureFrame()} 关掉。
+     * GPU Image 必须显式 close，不能留给 Cleaner 线程，否则和渲染线程的 flush 并发会 SIGTRAP。
+     */
+    private static Image sourceForFrame(DirectContext ctx) {
+        if (frameSource != null && frameSourceStamp == frameStamp) return frameSource;
+        closeFrameSource();
+        Image snapshot = null;
+        if (captureTexture instanceof VulkanGpuTexture) {
+            long vkImage = ((VulkanGpuTexture) captureTexture).vkImage();
+            // layout 必须是 GENERAL(1)。MC 的 copy 不做 layout 过渡，声明 UNDEFINED
+            // 会让 Skia 把内容作废，模糊图全黑。
+            BackendRenderTarget brt = BackendRenderTarget.makeVulkan(
+                    captureW, captureH, vkImage,
+                    0, 1, 37, 0x10 | 0x04 | 0x02 | 0x01, 1, 1);
+            Surface freshSurface = Surface.wrapBackendRenderTarget(
+                    ctx, brt, SurfaceOrigin.BOTTOM_LEFT, ColorType.RGBA_8888, null);
+            if (freshSurface == null) {
+                brt.close();
+                return null;
+            }
+            snapshot = freshSurface.makeImageSnapshot();
+            freshSurface.close();
+            brt.close();
+        } else if (GpuContextHelper.isGL()) {
+            snapshot = getGlSnapshot(ctx);
+        }
+        frameSource = snapshot;
+        frameSourceStamp = frameStamp;
+        return snapshot;
+    }
+
+    private static void closeFrameSource() {
+        if (frameSource != null) {
+            try { frameSource.close(); } catch (Throwable ignored) { }
+            frameSource = null;
+        }
+        frameSourceStamp = -1;
     }
 
     /** OpenGL 回读路径：读回帧缓冲到 CPU Image，避免 GPU 纹理包装导致的递归崩溃 */
@@ -288,31 +390,36 @@ public final class BackdropBlurCapture {
                 return null;
             }
 
-            // 读回像素到 CPU ByteBuffer
+            // 读回像素到 heap byte[]：makeRasterFromBytes 会拷贝进 Skia 自有存储，
+            // 避免 makeRasterDirect 指向 DirectByteBuffer 在方法返回后被 GC 回收
+            // （实测：drawImageRect → glTexSubImage2D → SIGSEGV / memmove）。
             java.nio.ByteBuffer pixels = java.nio.ByteBuffer.allocateDirect(captureW * captureH * 4);
             GL11.glReadPixels(0, 0, captureW, captureH, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
             GL30.glDeleteFramebuffers(fboId[0]);
+            pixels.rewind();
+            byte[] bytes = new byte[captureW * captureH * 4];
+            pixels.get(bytes);
 
-            // 从 CPU 像素创建 Skia Image
             ImageInfo info = ImageInfo.makeN32Premul(captureW, captureH);
-            long pixelsPtr = org.lwjgl.system.MemoryUtil.memAddress(pixels);
-            Surface cpuSurface = Surface.makeRasterDirect(info, pixelsPtr, captureW * 4);
-            if (cpuSurface == null) {
-                cpuSurface = Surface.makeRasterN32Premul(captureW, captureH);
-                if (cpuSurface == null) return null;
-            }
-            Image snap = cpuSurface.makeImageSnapshot();
-            cpuSurface.close();
-            return snap;
+            return Image.makeRasterFromBytes(info, bytes, (long) captureW * 4L);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[QPlayer] BackdropBlurCapture GL snapshot failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[QPlayer] BackdropBlurCapture GL snapshot failed: {}", t.toString());
             return null;
         }
     }
 
     public static void dispose() {
         closeBlurCache();
+        closeFrameSource();
         blurCacheStamp = -1;
+        for (ImageFilter filter : filterCache.values()) {
+            try { filter.close(); } catch (Throwable ignored) { }
+        }
+        filterCache.clear();
+        if (opaqueAlpha != null) {
+            try { opaqueAlpha.close(); } catch (Throwable ignored) { }
+            opaqueAlpha = null;
+        }
         if (captureTexture != null) { captureTexture.close(); captureTexture = null; }
         if (blurSurface != null) { blurSurface.close(); blurSurface = null; }
         captureW = 0;

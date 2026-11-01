@@ -1,6 +1,6 @@
 package com.ylmac.adapt.features.module.impl.render;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.command.FriendManager;
 import com.ylmac.adapt.features.module.Category;
 import com.ylmac.adapt.features.module.Module;
@@ -154,7 +154,7 @@ public class ESP2D extends Module implements HudElement {
                     scrW, scrH, texW, texH, texW, texH);
             pose.popMatrix();
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[ESP2D] render error: {}", t.toString());
+            AdaptClient.LOGGER.warn("[ESP2D] render error: {}", t.toString());
         }
     }
 
@@ -170,7 +170,7 @@ public class ESP2D extends Module implements HudElement {
             SkijaNativeFix.preload();
             surf = new MinecraftSurfaceBackend("esp2d", scrW, scrH, deviceScale);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[ESP2D] surface init failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[ESP2D] surface init failed: {}", t.toString());
             surf = null;
         }
     }

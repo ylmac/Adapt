@@ -82,6 +82,6 @@ public class InventoryMove extends Module {
     private boolean physicalKeyDown(KeyMapping keyMapping) {
         com.mojang.blaze3d.platform.InputConstants.Key key =
                 ((com.ylmac.adapt.injection.mixins.KeyMappingAccessor) keyMapping).adapt_getKey();
-        return com.mojang.blaze3d.platform.InputConstants.isKeyDown(mc.getWindow(), key.getValue());
+        return com.mojang.blaze3d.platform.InputConstants.isKeyDown(key.getValue());
     }
 }

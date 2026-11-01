@@ -1,6 +1,6 @@
 package com.ylmac.adapt.metal;
 
-import com.mojang.blaze3d.systems.GpuDevice;
+import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.EXTMetalObjects;
@@ -26,9 +26,9 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
  * <p>
  * <b>完整调用链（26.2 实证，javap 于 minecraft-clientonly-deobf-26.2.jar）</b>
  * <pre>
- * RenderSystem.getDevice()                    → com.mojang.blaze3d.systems.GpuDevice
+ * RenderSystem.getDevice()                    → com.mojang.renderpearl.api.device.GpuDevice
  *   ↓ private final GpuDeviceBackend backend  ← 必须反射，26.2 无 public getter
- * (VulkanDevice) backend                      → com.mojang.blaze3d.vulkan.VulkanDevice
+ * (VulkanDevice) backend                      → com.mojang.renderpearl.backend.vulkan.VulkanDevice
  *   ↓ public VkDevice vkDevice()
  *   ↓ public VulkanQueue graphicsQueue() → record，public VkQueue vkQueue()
  * vkExportMetalObjectsEXT(vkDevice, &amp;info)  → pNext 链：
@@ -197,7 +197,7 @@ public final class MetalBridge {
             fail("GpuDevice.backend not readable (see accessWidener note)");
             return;
         }
-        if (!(backend instanceof com.mojang.blaze3d.vulkan.VulkanDevice vulkanDevice)) {
+        if (!(backend instanceof com.mojang.renderpearl.backend.vulkan.VulkanDevice vulkanDevice)) {
             fail("backend is " + backend.getClass().getName() + ", not VulkanDevice");
             return;
         }

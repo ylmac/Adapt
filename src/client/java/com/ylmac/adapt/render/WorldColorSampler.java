@@ -2,12 +2,12 @@ package com.ylmac.adapt.render;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import io.github.timer_err.qml4j.runtime.color.StyleManager;
+import com.ylmac.adapt.theme.StyleManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import com.ylmac.adapt.config.DesktopSettings;
 import com.ylmac.adapt.features.music.PlayerController;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
 /**
  * World-driven "Monet" seed sampling.
@@ -69,7 +69,7 @@ public final class WorldColorSampler {
     /** Called every client tick (Minecraft game loop, 20 Hz). */
     public void onTick(Minecraft mc) {
         // 诊断：QML LinearProgress 拖拽事件计数变化即打印
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         if (pc != null && pc.qmlDragDebug != null) {
             // QML 侧 JS 数值写入后可能是 Long/Double，不能直接强转 Integer。
             try {
@@ -77,13 +77,13 @@ public final class WorldColorSampler {
                 int v = dv instanceof Number ? ((Number) dv).intValue() : 0;
                 if (v != lastDragDebug) {
                     lastDragDebug = v;
-                    QplayerModClient.LOGGER.info("[QPlayer] QML drag events: {}", v);
+                    AdaptClient.LOGGER.info("[QPlayer] QML drag events: {}", v);
                 }
             } catch (Throwable ignored) {
                 // 诊断日志绝不能把整个游戏带崩
             }
         }
-        DesktopSettings settings = QplayerScreen.getDesktopSettings();
+        DesktopSettings settings = AdaptScreen.getDesktopSettings();
         // 封面取色监听器（一次性挂载）：来源=封面时由它投种子，世界采样暂停。
         CoverSeedSampler.get().attachIfNeeded();
         if (settings == null || !Boolean.TRUE.equals(settings.monetEnabled.peek())) {
@@ -112,7 +112,7 @@ public final class WorldColorSampler {
         if (monetSource != 1) {
             if (!loggedEnabled) {
                 loggedEnabled = true;
-                QplayerModClient.LOGGER.info("[QPlayer] Monet cover sampler active");
+                AdaptClient.LOGGER.info("[QPlayer] Monet cover sampler active");
             }
             return;
         }
@@ -122,13 +122,13 @@ public final class WorldColorSampler {
         if (rt == null || rt.width <= 0 || rt.height <= 0) return;
         if (!loggedEnabled) {
             loggedEnabled = true;
-            QplayerModClient.LOGGER.info("[QPlayer] Monet world sampler active ({})",
+            AdaptClient.LOGGER.info("[QPlayer] Monet world sampler active ({})",
                 rt.width + "x" + rt.height);
         }
         if (forceSnapshot) {
             forceSnapshot = false;
             requestSample(rt);
-            QplayerModClient.LOGGER.info("[QPlayer] Monet snapshot on GUI open");
+            AdaptClient.LOGGER.info("[QPlayer] Monet snapshot on GUI open");
         }
     }
 
@@ -148,7 +148,7 @@ public final class WorldColorSampler {
             curH = seed[0]; curC = seed[1]; curT = seed[2];
             hasApplied = true;
             applySeed(curH, curC, curT);
-            QplayerModClient.LOGGER.info("[QPlayer] Monet seed set: H={} C={} T={}",
+            AdaptClient.LOGGER.info("[QPlayer] Monet seed set: H={} C={} T={}",
                 String.format("%.1f", curH), String.format("%.1f", curC), String.format("%.1f", curT));
             return;
         }
@@ -158,14 +158,14 @@ public final class WorldColorSampler {
         // 阈值（hue≥10°/chroma≥4/tone≥4）：世界微变、指针/界面像素扰动不触发重染，
         // 只有场景级变化才换色，避免无意义的 scheme 重建。
         if (hueDiff < 10.0 && chromaDiff < 4.0 && toneDiff < 4.0) {
-            QplayerModClient.LOGGER.debug("[QPlayer] Monet seed unchanged (Δh={} Δc={} Δt={})",
+            AdaptClient.LOGGER.debug("[QPlayer] Monet seed unchanged (Δh={} Δc={} Δt={})",
                 String.format("%.1f", hueDiff), String.format("%.1f", chromaDiff), String.format("%.1f", toneDiff));
             return;
         }
         String before = currentSchemePrimary();
         curH = seed[0]; curC = seed[1]; curT = seed[2];
         applySeed(curH, curC, curT);
-        QplayerModClient.LOGGER.info("[QPlayer] Monet seed applied: H={} C={} T={} (Δh={} Δc={} Δt={}), primary {} -> {}",
+        AdaptClient.LOGGER.info("[QPlayer] Monet seed applied: H={} C={} T={} (Δh={} Δc={} Δt={}), primary {} -> {}",
             String.format("%.1f", curH), String.format("%.1f", curC), String.format("%.1f", curT),
             String.format("%.1f", hueDiff), String.format("%.1f", chromaDiff), String.format("%.1f", toneDiff),
             before, currentSchemePrimary());
@@ -219,12 +219,12 @@ public final class WorldColorSampler {
         forceSnapshot = true;
         inFlight = false;
         lastRequestAt = 0;
-        DesktopSettings s = QplayerScreen.getDesktopSettings();
+        DesktopSettings s = AdaptScreen.getDesktopSettings();
         if (s == null) return;
         int src = s.monetSource == null || s.monetSource.peek() == null
             ? 1 : s.monetSource.peek().intValue();
         if (src == 0) {
-            PlayerController pc = QplayerScreen.getPlayerController();
+            PlayerController pc = AdaptScreen.getPlayerController();
             if (pc != null) {
                 byte[] bytes = pc.coverBytes.peek();
                 if (bytes != null) CoverSeedSampler.get().forceNow(bytes);
@@ -237,7 +237,7 @@ public final class WorldColorSampler {
             // __instance() is typed java.lang.Object in the runtime; cast before use.
             ((StyleManager) StyleManager.__instance()).setSeedColorHct(h, c, t);
         } catch (Throwable ex) {
-            QplayerModClient.LOGGER.warn("[QPlayer] Monet seed apply failed: {} ({})",
+            AdaptClient.LOGGER.warn("[QPlayer] Monet seed apply failed: {} ({})",
                 ex.getClass().getSimpleName(), ex.getMessage());
         }
     }
@@ -249,10 +249,10 @@ public final class WorldColorSampler {
         lastRequestAt = System.currentTimeMillis();
         try {
             Screenshot.takeScreenshot(rt, down, this::onImageReady);
-            QplayerModClient.LOGGER.debug("[QPlayer] Monet screenshot {}x{} ×{}", w, h, down);
+            AdaptClient.LOGGER.debug("[QPlayer] Monet screenshot {}x{} ×{}", w, h, down);
         } catch (Throwable t) {
             inFlight = false;
-            QplayerModClient.LOGGER.warn("[QPlayer] Monet screenshot failed: {} ({})",
+            AdaptClient.LOGGER.warn("[QPlayer] Monet screenshot failed: {} ({})",
                 t.getClass().getSimpleName(), t.getMessage());
         }
     }
@@ -296,7 +296,7 @@ public final class WorldColorSampler {
                 src = down;
             }
 
-            QplayerModClient.LOGGER.info("[QPlayer] Monet readback {}x{} → {}x{} ({} px)",
+            AdaptClient.LOGGER.info("[QPlayer] Monet readback {}x{} → {}x{} ({} px)",
                 iw, ih, sw, sh, src.length);
 
             // Detach the pixels (ABGR → ARGB) and quantize off-thread
@@ -310,7 +310,7 @@ public final class WorldColorSampler {
                     double[] hct = MonetQuantizer.extractSeedColorHct(argb, ACCURACY);
                     pendingSeed = hct;
                 } catch (Throwable ex) {
-                    QplayerModClient.LOGGER.warn("[QPlayer] Monet quantize failed: {} ({})",
+                    AdaptClient.LOGGER.warn("[QPlayer] Monet quantize failed: {} ({})",
                         ex.getClass().getSimpleName(), ex.getMessage());
                 }
             }, "qplayer-monet-quantize");

@@ -1,6 +1,6 @@
 package com.ylmac.adapt.injection.mixins;
 
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.ylmac.adapt.render.AdaptLightingUniform;
 import com.ylmac.adapt.render.AdaptShadowMap;

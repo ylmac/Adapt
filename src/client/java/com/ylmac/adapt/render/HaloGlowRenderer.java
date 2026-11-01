@@ -1,11 +1,11 @@
 package com.ylmac.adapt.render;
 
-import com.mojang.blaze3d.GpuFormat;
+import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.resource.ResourceHandle;
-import com.mojang.blaze3d.systems.CommandEncoder;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PostChain;
@@ -33,6 +33,7 @@ public final class HaloGlowRenderer {
 
     private static TextureTarget maskTarget;
     private static boolean maskRequested;
+    private static boolean chainMissingLogged;
 
     private HaloGlowRenderer() {
     }
@@ -44,6 +45,14 @@ public final class HaloGlowRenderer {
 
     public static boolean hasMask() {
         return maskRequested;
+    }
+
+    /** 屏幕辉光的额外深度目标会让 MoltenVK 原生崩溃。环本体不走这里。 */
+    public static void skipScreenGlow() {
+        if (!chainMissingLogged) {
+            chainMissingLogged = true;
+            LOGGER.warn("Halo screen glow skipped: the extra depth target faults MoltenVK");
+        }
     }
 
     /**
@@ -74,7 +83,7 @@ public final class HaloGlowRenderer {
                     + width + "x" + height);
         }
         if (maskTarget == null) {
-            maskTarget = new TextureTarget("adaptclient_halo_mask", width, height, true, MASK_FORMAT);
+            maskTarget = new TextureTarget("adaptclient_halo_mask", width, height, MASK_FORMAT, GpuFormat.D32_FLOAT);
             LOGGER.info("Created halo mask target {}x{}", width, height);
         } else if (maskTarget.width != width || maskTarget.height != height) {
             maskTarget.resize(width, height);
@@ -94,17 +103,24 @@ public final class HaloGlowRenderer {
             throw new IllegalStateException("Halo mask preparation must run on the render thread");
         }
 
-        if (!main.useDepth || main.getDepthTexture() == null) {
+        if (!main.hasDepth() || main.getDepthTexture() == null) {
             throw new IllegalStateException("Main render target has no depth texture");
         }
         ensureMaskTarget(main.width, main.height);
 
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
-        encoder.clearColorAndDepthTextures(maskTarget.getColorTexture(), MASK_CLEAR_COLOR,
-                maskTarget.getDepthTexture(), RenderSystem.DEFAULT_DEPTH_CLEAR_VALUE);
-        // MC 26.2: mip, destX, destY, sourceX, sourceY, width, height.
-        encoder.copyTextureToTexture(main.getDepthTexture(), maskTarget.getDepthTexture(),
-                0, 0, 0, 0, 0, main.width, main.height);
+        try {
+            CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+            encoder.clearColorAndDepthTextures(maskTarget.getColorTexture(), MASK_CLEAR_COLOR,
+                    maskTarget.getDepthTexture(), RenderSystem.DEFAULT_DEPTH_CLEAR_VALUE);
+            // MC 26.2: mip, destX, destY, sourceX, sourceY, width, height.
+            encoder.copyTextureToTexture(main.getDepthTexture(), maskTarget.getDepthTexture(),
+                    0, 0, 0, 0, 0, main.width, main.height);
+        } catch (RuntimeException e) {
+            if (!chainMissingLogged) {
+                chainMissingLogged = true;
+                LOGGER.warn("Halo mask copy skipped: {}", e.toString());
+            }
+        }
     }
 
     /**
@@ -145,7 +161,11 @@ public final class HaloGlowRenderer {
         PostChain chain = Minecraft.getInstance().getShaderManager()
                 .getPostChain(HALO_POST_CHAIN_ID, Set.of(PostChain.MAIN_TARGET_ID, HALO_MASK_ID));
         if (chain == null) {
-            throw new IllegalStateException("Halo post chain is unavailable: " + HALO_POST_CHAIN_ID);
+            if (!chainMissingLogged) {
+                chainMissingLogged = true;
+                LOGGER.warn("Halo post chain unavailable, screen glow skipped: {}", HALO_POST_CHAIN_ID);
+            }
+            return;
         }
         chain.addToFrame(graph, width, height, bundle);
         // Keep the request alive until the main pass reaches executeTranslucent(),

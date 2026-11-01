@@ -1,7 +1,7 @@
 package com.ylmac.adapt.injection.mixins;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTexture;
 import com.ylmac.adapt.features.module.impl.render.Fullbright;
 import net.minecraft.client.renderer.Lightmap;
 import net.minecraft.client.renderer.state.LightmapRenderState;

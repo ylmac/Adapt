@@ -1,13 +1,13 @@
 package com.ylmac.adapt.injection.mixins;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.textures.GpuSampler;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.ylmac.adapt.render.AdaptEntityPipelines;
 import com.ylmac.adapt.render.AdaptLightingUniform;
 import com.ylmac.adapt.render.AdaptShadowMap;
@@ -145,14 +145,14 @@ public abstract class SodiumTerrainUniformMixin {
         // 不透明地形误判成 translucent（走 sodium_terrain_translucent 近似光照
         // → 世界平板全亮）。必须用 isPresent()。
         boolean translucent = false;
-        ColorTargetState[] targets = pipeline.getColorTargetStates();
-        if (targets != null && targets.length > 0 && targets[0] != null
-                && targets[0].blendFunction().isPresent()) {
+        var targets = pipeline.getColorTargetStates();
+        if (targets != null && !targets.isEmpty() && targets.get(0) != null
+                && targets.get(0).blendFunction().isPresent()) {
             translucent = true;
         }
         // 先替换管线（Adapt 副本），再 setPipeline，最后补绑 UBO
         RenderPipeline replaced = AdaptEntityPipelines.redirectSodiumTerrain(pipeline, translucent);
-        pass.setPipeline(replaced);
+        pass.setPipeline(com.mojang.blaze3d.systems.RenderSystem.getCompiledPipeline(replaced));
         if (!com.ylmac.adapt.render.AdaptRenderToggle.isWorldEffectsEnabled()) {
             // 总开关关闭：管线已由上面原样返回，也不绑 AdaptLighting/ShadowFrame
             // ——原版地形管线不认识这些 uniform。

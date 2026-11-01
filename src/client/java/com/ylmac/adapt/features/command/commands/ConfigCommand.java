@@ -2,7 +2,7 @@ package com.ylmac.adapt.features.command.commands;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.config.store.AppDirs;
 import com.ylmac.adapt.features.command.Command;
 import com.ylmac.adapt.features.module.ModuleRegistry;
@@ -106,7 +106,7 @@ public class ConfigCommand extends Command {
             lastConfig = name;
             return true;
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[ConfigCommand] load {} failed: {}", name, e.toString());
+            AdaptClient.LOGGER.warn("[ConfigCommand] load {} failed: {}", name, e.toString());
             return false;
         }
     }

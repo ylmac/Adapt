@@ -226,7 +226,10 @@ public final class Halo3D extends Module {
         // - lightType（RenderTypes.eyes ← EYES）：不写深度、纯光叠加。用于发光层和条纹。
         RenderType lightType = RenderTypes.eyes(HALO_TEXTURE);
         RenderType bodyType = RenderTypes.breezeWind(HALO_TEXTURE, 0.0f, 0.0f);
-        RenderType maskType = screenGlow.getValue() ? HaloGlowRenderer.maskType() : null;
+        // 屏幕辉光要另开一张全屏深度目标。MoltenVK 在这条路径上是原生 SIGSEGV，
+        // Java 抓不到。环本体继续画，辉光先不申请那张目标。
+        if (screenGlow.getValue()) HaloGlowRenderer.skipScreenGlow();
+        RenderType maskType = null;
         for (Entity entity : mc.level.entitiesForRendering()) {
             if (!(entity instanceof Player player)) {
                 continue;
@@ -266,10 +269,10 @@ public final class Halo3D extends Module {
             PoseStack pose = new PoseStack();
             pose.translate((float) relativePos.x, (float) y, (float) relativePos.z);
             if (followHead.getValue()) {
-                pose.mulPose(new Quaternionf().rotateY((float) Math.toRadians(-player.getYRot(partialTicks))));
+                pose.rotate(new Quaternionf().rotateY((float) Math.toRadians(-player.getYRot(partialTicks))));
             }
-            pose.mulPose(new Quaternionf().rotateY((float) (System.nanoTime() * 1.0E-9 * spinSpeed.getValue())));
-            pose.mulPose(new Quaternionf().rotateZ((float) Math.toRadians(tilt.getValue())));
+            pose.rotate(new Quaternionf().rotateY((float) (System.nanoTime() * 1.0E-9 * spinSpeed.getValue())));
+            pose.rotate(new Quaternionf().rotateZ((float) Math.toRadians(tilt.getValue())));
 
             submitPlayerHalo(storage, lightType, bodyType, maskType, pose, lighting);
         }

@@ -2,7 +2,9 @@ package com.ylmac.adapt.render;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.ylmac.adapt.QplayerModClient;
+import com.mojang.blaze3d.platform.InputConstants;
+import org.lwjgl.sdl.SDLScancode;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.config.DesktopSettings;
 import com.ylmac.adapt.features.event.bus.EventBus;
 import com.ylmac.adapt.features.event.bus.EventHandler;
@@ -42,10 +44,6 @@ import java.util.Map;
  */
 public final class HudEditor {
 
-    /** GLFW_KEY_RIGHT_SUPER —— 右 Command（macOS）/ 右 Win 键。 */
-    private static final int KEY_RIGHT_COMMAND = 347;
-    private static final int KEY_ESCAPE = 256;
-
     private static final Gson GSON = new Gson();
 
     private static final HudEditor INSTANCE = new HudEditor();
@@ -66,6 +64,15 @@ public final class HudEditor {
     private float dragOffsetX;
     private float dragOffsetY;
     private boolean loaded;
+    /** 拖动开始前的位置，最多留 32 步。 */
+    private final List<Map<String, float[]>> undo = new ArrayList<>();
+    private boolean pushedUndo;
+    private int dragAx;
+    private int dragAy;
+    private float dragMx;
+    private float dragMy;
+    private String notice = "";
+    private long noticeUntil;
 
     // ── 点击 vs 拖动 ──
     // 用户要的行为：按下后很快松开 = 点击（转发给元素，按钮照样能按），
@@ -84,7 +91,7 @@ public final class HudEditor {
     private HudEditor() {
     }
 
-    /** 由 QplayerModClient 在 mod 初始化时调用一次：订阅键盘/鼠标事件。 */
+    /** 由 AdaptClient 在 mod 初始化时调用一次：订阅键盘/鼠标事件。 */
     public void init() {
         EventBus.INSTANCE.subscribe(this);
         loadPositions();
@@ -111,7 +118,7 @@ public final class HudEditor {
         if (!active) {
             // 只有在世界里（没有打开任何 Screen）才允许进入编辑态，否则会和
             // ESC 关闭 GUI、聊天框输入等冲突。
-            if (press && key == KEY_RIGHT_COMMAND
+            if (press && key == SDLScancode.SDL_SCANCODE_RGUI
                     && Minecraft.getInstance().gui.screen() == null) {
                 setActive(true);
                 event.cancel();
@@ -119,9 +126,21 @@ public final class HudEditor {
             return;
         }
 
-        if (press && key == KEY_ESCAPE) {
+        if (press && key == SDLScancode.SDL_SCANCODE_ESCAPE) {
             setActive(false);          // 内部会保存
             event.cancel();  // 不让它顺带打开暂停菜单
+            return;
+        }
+        if (press && key == SDLScancode.SDL_SCANCODE_Z && commandDown()) {
+            undo();
+            event.cancel();
+            return;
+        }
+        if (press && key >= SDLScancode.SDL_SCANCODE_1 && key <= SDLScancode.SDL_SCANCODE_5 && commandDown()) {
+            int slot = key - SDLScancode.SDL_SCANCODE_1 + 1;
+            if (shiftDown()) saveProfile(slot);
+            else loadProfile(slot);
+            event.cancel();
             return;
         }
         // 编辑态吞掉其余按键的按下事件（释放放行，否则输入系统会认为键还按着）。
@@ -159,6 +178,8 @@ public final class HudEditor {
                 }
             }
         } else {
+            MovableHud finished = dragging;
+            boolean moved = dragging != null && !resizing;
             if (pending != null && pendingInBody) {
                 // 短按（没被判定成拖动）→ 当作点击转发给元素。
                 pending.hudClick(mx, my);
@@ -166,6 +187,11 @@ public final class HudEditor {
             pending = null;
             dragging = null;
             resizing = false;
+            pushedUndo = false;
+            if (moved && finished != null) {
+                storeAnchor(finished, dragAx, dragAy, dragMx, dragMy);
+                savePositions();
+            }
         }
         // 编辑态吞掉鼠标点击：否则拖动会顺带挖方块/放置方块。
         event.cancel();
@@ -180,6 +206,7 @@ public final class HudEditor {
      * 盖在元素上、拖动的元素能跟着鼠标走。
      */
     public void renderFrames(GuiGraphicsExtractor g) {
+        applyAnchors(g.guiWidth(), g.guiHeight());
         if (!active) return;
         Minecraft mc = Minecraft.getInstance();
 
@@ -194,6 +221,10 @@ public final class HudEditor {
             long held = System.nanoTime() - pressNanos;
             float moved = Math.max(Math.abs(mx - pressX), Math.abs(my - pressY));
             if (held >= DRAG_HOLD_NANOS || moved > DRAG_MOVE_PX) {
+                if (!pushedUndo) {
+                    pushUndo();
+                    pushedUndo = true;
+                }
                 dragging = pending;
                 resizing = pendingResize;
                 pending = null;
@@ -216,7 +247,12 @@ public final class HudEditor {
                 float guiW = g.guiWidth(), guiH = g.guiHeight();
                 nx = Math.max(0f, Math.min(Math.max(0f, guiW - dragging.hudW()), nx));
                 ny = Math.max(0f, Math.min(Math.max(0f, guiH - dragging.hudH()), ny));
-                dragging.setHudPos(nx, ny);
+                float[] snapped = snap(nx, ny, dragging.hudW(), dragging.hudH(), guiW, guiH);
+                dragging.setHudPos(snapped[0], snapped[1]);
+                dragAx = Math.round(snapped[2]);
+                dragAy = Math.round(snapped[3]);
+                dragMx = snapped[4];
+                dragMy = snapped[5];
             }
         }
 
@@ -231,6 +267,11 @@ public final class HudEditor {
             drawHandle(g, e, true);
             drawHandle(g, e, false);
         }
+        String hint = noticeUntil > System.currentTimeMillis()
+                ? notice
+                : "拖到边缘或中间会吸住    ⌘Z 撤销    ⌘1–5 读取    ⇧⌘1–5 保存";
+        int hintWidth = mc.font.width(hint);
+        g.text(mc.font, hint, Math.max(4, (g.guiWidth() - hintWidth) / 2), 6, 0xFFFFFFFF, true);
     }
 
     /** 手柄边长（GUI 坐标）。比元素本身小一圈，但足够点中。 */
@@ -367,13 +408,13 @@ public final class HudEditor {
                 mc.mouseHandler.grabMouse();
             }
         }
-        QplayerModClient.LOGGER.info("[HUD] editor {}", active ? "opened" : "closed (saved)");
+        AdaptClient.LOGGER.info("[HUD] editor {}", active ? "opened" : "closed (saved)");
     }
 
     private void loadPositions() {
         if (loaded) return;
         loaded = true;
-        DesktopSettings s = QplayerScreen.getDesktopSettings();
+        DesktopSettings s = AdaptScreen.getDesktopSettings();
         if (s == null) return;
         String json = s.hudLayout.peek();
         if (json == null || json.isBlank()) return;
@@ -384,15 +425,18 @@ public final class HudEditor {
             for (Map.Entry<String, List<Float>> e : parsed.entrySet()) {
                 List<Float> v = e.getValue();
                 if (v == null || v.size() < 2 || v.get(0) == null || v.get(1) == null) continue;
-                float[] entry = new float[]{v.get(0), v.get(1), 0, 0};
+                float[] entry = new float[]{v.get(0), v.get(1), 0, 0, 0, 0, 0, 0};
                 if (v.size() >= 4 && v.get(2) != null && v.get(3) != null) {
                     entry[2] = v.get(2);
                     entry[3] = v.get(3);
                 }
+                for (int i = 4; i < 8 && i < v.size(); i++) {
+                    if (v.get(i) != null) entry[i] = v.get(i);
+                }
                 positions.put(e.getKey(), entry);
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[HUD] layout parse failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[HUD] layout parse failed: {}", t.toString());
         }
     }
 
@@ -411,17 +455,180 @@ public final class HudEditor {
     private void savePositions() {
         Map<String, float[]> current = new LinkedHashMap<>();
         for (MovableHud e : elements) {
-            current.put(e.hudId(), new float[]{
-                    e.hudX(), e.hudY(), e.hudGridCols(), e.hudGridRows()});
+            float[] prev = positions.get(e.hudId());
+            float[] row = new float[]{e.hudX(), e.hudY(), e.hudGridCols(), e.hudGridRows(), 0, 0, 0, 0};
+            if (prev != null) {
+                for (int i = 4; i < 8 && i < prev.length; i++) row[i] = prev[i];
+            }
+            current.put(e.hudId(), row);
         }
         positions.clear();
         positions.putAll(current);
-        DesktopSettings s = QplayerScreen.getDesktopSettings();
+        DesktopSettings s = AdaptScreen.getDesktopSettings();
         if (s == null) return;
         try {
             s.hudLayout.set(GSON.toJson(current));
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[HUD] layout save failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[HUD] layout save failed: {}", t.toString());
         }
+    }
+
+    /** 靠近屏幕边或正中时吸住，并记下锚点，窗口大小变了还贴着那一条边。 */
+    private static float[] snap(float x, float y, float w, float h, float guiW, float guiH) {
+        float limit = 8f;
+        int ax = 0;
+        int ay = 0;
+        float mx = x;
+        float my = y;
+        if (x <= limit) {
+            x = 0f;
+            ax = 1;
+            mx = 0f;
+        } else if (guiW - (x + w) <= limit) {
+            x = Math.max(0f, guiW - w);
+            ax = 2;
+            mx = Math.max(0f, guiW - (x + w));
+        } else if (Math.abs(x - (guiW - w) / 2f) <= limit) {
+            x = (guiW - w) / 2f;
+            ax = 3;
+            mx = 0f;
+        }
+        if (y <= limit) {
+            y = 0f;
+            ay = 1;
+            my = 0f;
+        } else if (guiH - (y + h) <= limit) {
+            y = Math.max(0f, guiH - h);
+            ay = 2;
+            my = Math.max(0f, guiH - (y + h));
+        } else if (Math.abs(y - (guiH - h) / 2f) <= limit) {
+            y = (guiH - h) / 2f;
+            ay = 3;
+            my = 0f;
+        }
+        return new float[]{x, y, ax, ay, mx, my};
+    }
+
+    private void applyAnchors(float guiW, float guiH) {
+        for (MovableHud e : elements) {
+            if (e == dragging || e == pending) continue;
+            float[] p = positions.get(e.hudId());
+            if (p == null || p.length < 6) continue;
+            int ax = Math.round(p[4]);
+            int ay = Math.round(p[5]);
+            if (ax == 0 && ay == 0) continue;
+            float mx = p.length > 6 ? p[6] : 0f;
+            float my = p.length > 7 ? p[7] : 0f;
+            float x = e.hudX();
+            float y = e.hudY();
+            if (ax == 1) x = mx;
+            else if (ax == 2) x = guiW - e.hudW() - mx;
+            else if (ax == 3) x = (guiW - e.hudW()) / 2f;
+            if (ay == 1) y = my;
+            else if (ay == 2) y = guiH - e.hudH() - my;
+            else if (ay == 3) y = (guiH - e.hudH()) / 2f;
+            if (Math.abs(x - e.hudX()) > 0.5f || Math.abs(y - e.hudY()) > 0.5f) e.setHudPos(x, y);
+        }
+    }
+
+    private void storeAnchor(MovableHud element, int ax, int ay, float mx, float my) {
+        float[] row = positions.get(element.hudId());
+        if (row == null || row.length < 8) {
+            float[] grown = new float[8];
+            if (row != null) System.arraycopy(row, 0, grown, 0, Math.min(row.length, 8));
+            row = grown;
+            positions.put(element.hudId(), row);
+        }
+        row[0] = element.hudX();
+        row[1] = element.hudY();
+        row[2] = element.hudGridCols();
+        row[3] = element.hudGridRows();
+        row[4] = ax;
+        row[5] = ay;
+        row[6] = mx;
+        row[7] = my;
+    }
+
+    private void pushUndo() {
+        Map<String, float[]> snap = new LinkedHashMap<>();
+        for (MovableHud e : elements) {
+            float[] prev = positions.get(e.hudId());
+            float[] row = new float[]{e.hudX(), e.hudY(), e.hudGridCols(), e.hudGridRows(), 0, 0, 0, 0};
+            if (prev != null) {
+                for (int i = 4; i < 8 && i < prev.length; i++) row[i] = prev[i];
+            }
+            snap.put(e.hudId(), row);
+        }
+        undo.add(snap);
+        if (undo.size() > 32) undo.remove(0);
+    }
+
+    private void undo() {
+        if (undo.isEmpty()) {
+            showNotice("没有可撤销的移动");
+            return;
+        }
+        Map<String, float[]> snap = undo.remove(undo.size() - 1);
+        positions.clear();
+        for (Map.Entry<String, float[]> entry : snap.entrySet()) {
+            positions.put(entry.getKey(), entry.getValue().clone());
+        }
+        for (MovableHud e : elements) applyStoredPosition(e);
+        savePositions();
+        showNotice("已撤销");
+    }
+
+    private void saveProfile(int slot) {
+        DesktopSettings settings = AdaptScreen.getDesktopSettings();
+        if (settings == null) return;
+        savePositions();
+        Map<String, String> all = readProfiles(settings);
+        String layout = settings.hudLayout.peek();
+        all.put(Integer.toString(slot), layout == null ? "" : layout);
+        settings.hudProfiles.set(GSON.toJson(all));
+        showNotice("已保存配置 " + slot);
+    }
+
+    private void loadProfile(int slot) {
+        DesktopSettings settings = AdaptScreen.getDesktopSettings();
+        if (settings == null) return;
+        String layout = readProfiles(settings).get(Integer.toString(slot));
+        if (layout == null || layout.isBlank()) {
+            showNotice("配置 " + slot + " 是空的");
+            return;
+        }
+        pushUndo();
+        settings.hudLayout.set(layout);
+        positions.clear();
+        loaded = false;
+        loadPositions();
+        for (MovableHud e : elements) applyStoredPosition(e);
+        showNotice("已读取配置 " + slot);
+    }
+
+    private Map<String, String> readProfiles(DesktopSettings settings) {
+        String json = settings.hudProfiles.peek();
+        if (json == null || json.isBlank()) return new LinkedHashMap<>();
+        try {
+            Map<String, String> parsed = GSON.fromJson(json, new TypeToken<Map<String, String>>() { }.getType());
+            return parsed == null ? new LinkedHashMap<>() : new LinkedHashMap<>(parsed);
+        } catch (Throwable t) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    private void showNotice(String text) {
+        notice = text;
+        noticeUntil = System.currentTimeMillis() + 1600L;
+    }
+
+    private static boolean commandDown() {
+        return InputConstants.isKeyDown(SDLScancode.SDL_SCANCODE_LGUI)
+                || InputConstants.isKeyDown(SDLScancode.SDL_SCANCODE_RGUI);
+    }
+
+    private static boolean shiftDown() {
+        return InputConstants.isKeyDown(SDLScancode.SDL_SCANCODE_LSHIFT)
+                || InputConstants.isKeyDown(SDLScancode.SDL_SCANCODE_RSHIFT);
     }
 }

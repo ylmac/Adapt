@@ -1,6 +1,6 @@
 package com.ylmac.adapt.render;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.module.ModuleRegistry;
 import com.ylmac.adapt.features.module.impl.render.ClockWidgetModule;
 import io.github.humbleui.skija.Canvas;
@@ -206,6 +206,11 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
         return isEnabled() && mc.level != null;
     }
 
+    /** Modern 卡片会取世界模糊。Classic 表盘不采。 */
+    public static boolean wantsBackdrop() {
+        return get().hudVisible() && isModern();
+    }
+
     @Override
     public void setHudPos(float x, float y) {
         posX = x;
@@ -276,10 +281,19 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, DeltaTracker dt) {
         if (!hudVisible()) return;
+        Probe.begin("hud.clock");
+        try {
+            extractClock(g, dt);
+        } finally {
+            Probe.end("hud.clock");
+        }
+    }
+
+    private void extractClock(GuiGraphicsExtractor g, DeltaTracker dt) {
         try {
             render(g);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[ClockWidget] render error: {}", t.toString());
+            AdaptClient.LOGGER.warn("[ClockWidget] render error: {}", t.toString());
         }
     }
 
@@ -449,8 +463,7 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
         try {
             // 1) 影子（黑 190，模糊 6）
             try {
-                var blur = io.github.humbleui.skija.ImageFilter.makeBlur(
-                        6f, 6f, io.github.humbleui.skija.FilterTileMode.DECAL);
+                var blur = CachedBlur.of(6f, io.github.humbleui.skija.FilterTileMode.DECAL);
                 Paint lp = new Paint().setImageFilter(blur);
                 int s1 = c.save();
                 try {
@@ -462,14 +475,12 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
                     c.restoreToCount(s1);
                 }
                 lp.close();
-                blur.close();
             } catch (Throwable ignored) {
             }
 
             // 2) bloom（主色 alpha 0x99，模糊 20）—— DIFFERENCE 挖掉卡片区域，只在外侧溢出
             try {
-                var blur = io.github.humbleui.skija.ImageFilter.makeBlur(
-                        20f, 20f, io.github.humbleui.skija.FilterTileMode.DECAL);
+                var blur = CachedBlur.of(20f, io.github.humbleui.skija.FilterTileMode.DECAL);
                 Paint lp = new Paint().setImageFilter(blur);
                 int s1 = c.save();
                 try {
@@ -482,7 +493,6 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
                     c.restoreToCount(s1);
                 }
                 lp.close();
-                blur.close();
             } catch (Throwable ignored) {
             }
 
@@ -494,10 +504,10 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
                 Minecraft mc = Minecraft.getInstance();
                 int guiW = mc.getWindow().getGuiScaledWidth();
                 int guiH = mc.getWindow().getGuiScaledHeight();
-                io.github.humbleui.skija.Image bd = BackdropBlurCapture.getBlurredImage(24f);
+                io.github.humbleui.skija.Image bd = BackdropBlurCapture.getBlurredImage();
                 if (bd == null && !loggedBlurUnavailable) {
                     loggedBlurUnavailable = true;
-                    QplayerModClient.LOGGER.warn("[ClockWidget] backdrop blur unavailable");
+                    AdaptClient.LOGGER.warn("[ClockWidget] backdrop blur unavailable");
                 }
                 if (bd != null) {
                     float scale = (float) scaleValue();
@@ -517,7 +527,7 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
                     if (fluidBg == null) {
                         fluidBg = new com.ylmac.adapt.features.music.lyric.skia.FluidBackground(System.nanoTime());
                     }
-                    com.ylmac.adapt.features.music.PlayerController pc = QplayerScreen.getPlayerController();
+                    com.ylmac.adapt.features.music.PlayerController pc = AdaptScreen.getPlayerController();
                     byte[] cover = pc == null ? null : pc.coverBytes.peek();
                     String key = pc == null ? "" : (String.valueOf(pc.title.peek()) + "|" + pc.artist.peek());
                     if (!key.equals(fluidTrackKey)) fluidTrackKey = key;
@@ -542,7 +552,7 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
                     c.drawPath(screenShape, paint);
                 }
             } catch (Throwable t) {
-                QplayerModClient.LOGGER.warn("[ClockWidget] modern card failed: {}", t.toString());
+                AdaptClient.LOGGER.warn("[ClockWidget] modern card failed: {}", t.toString());
             } finally {
                 c.restoreToCount(s1);
             }
@@ -757,9 +767,13 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
     }
 
     private Font pickBaseFont(int cp) {
-        Font latin = baseFont("/assets/adaptclient/qml/fonts/product_sans_medium.ttf");
+        Font latin = baseFontFirst(
+                "/assets/adaptclient/qml-retired/fonts/product_sans_medium.ttf",
+                "/assets/adaptclient/qml/fonts/product_sans_medium.ttf");
         if (latin != null && covers(latin.getTypeface(), cp)) return latin;
-        Font cjk = baseFont("/assets/adaptclient/qml/fonts/HarmonyOS_Sans_SC_Medium.ttf");
+        Font cjk = baseFontFirst(
+                "/assets/adaptclient/qml-retired/fonts/HarmonyOS_Sans_SC_Medium.ttf",
+                "/assets/adaptclient/qml/fonts/HarmonyOS_Sans_SC_Medium.ttf");
         if (cjk != null && covers(cjk.getTypeface(), cp)) return cjk;
         try {
             var mgr = io.github.humbleui.skija.FontMgr.getDefault();
@@ -779,6 +793,14 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
         return t != null && t.getUTF32Glyph(cp) != 0;
     }
 
+    private Font baseFontFirst(String... resources) {
+        for (String r : resources) {
+            Font f = baseFont(r);
+            if (f != null) return f;
+        }
+        return null;
+    }
+
     /** 一次性加载的字体文件（基础尺寸 12，用之前 setSize）。 */
     private Font baseFont(String resource) {
         if (baseFonts.containsKey(resource)) return baseFonts.get(resource);
@@ -790,7 +812,7 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
                 loaded = new Font(tf, 12f);
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[ClockWidget] font {} failed: {}", resource, t.toString());
+            AdaptClient.LOGGER.warn("[ClockWidget] font {} failed: {}", resource, t.toString());
         }
         baseFonts.put(resource, loaded);
         return loaded;
@@ -801,8 +823,8 @@ public final class ClockWidgetOverlay implements HudElement, MovableHud {
     @SuppressWarnings("unchecked")
     private static Map<String, String> themeScheme() {
         try {
-            Object inst = io.github.timer_err.qml4j.runtime.color.StyleManager.__instance();
-            if (inst instanceof io.github.timer_err.qml4j.runtime.color.StyleManager sm) {
+            Object inst = com.ylmac.adapt.theme.StyleManager.__instance();
+            if (inst instanceof com.ylmac.adapt.theme.StyleManager sm) {
                 Object scheme = sm.currentScheme.peek();
                 if (scheme instanceof Map<?, ?> m) {
                     return (Map<String, String>) m;

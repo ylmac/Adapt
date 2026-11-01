@@ -36,6 +36,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 import java.util.Random;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * Scaffold 自动搭路 —— 对齐 Rise 6.9.5 Scaffold 主循环（Phase 2：Normal 模式正确搭路）。
@@ -313,7 +314,7 @@ public class Scaffold extends Module {
         BlockHitResult hit = new BlockHitResult(hitVec, this.enumFacing.facing, this.blockFace, false);
         InteractionResult result = gm.useItemOn(player, InteractionHand.MAIN_HAND, hit);
         if (result.consumesAction()) {
-            player.swing(InteractionHand.MAIN_HAND);
+            player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
             // 本地 BadPackets 等价：放置后延迟一 tick（Rise BadPacketsComponent）
             this.badPacketsTicks = 1;
         }

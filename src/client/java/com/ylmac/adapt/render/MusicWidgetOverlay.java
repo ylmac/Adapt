@@ -1,6 +1,6 @@
 package com.ylmac.adapt.render;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.event.bus.EventBus;
 import com.ylmac.adapt.features.event.bus.EventHandler;
 import com.ylmac.adapt.features.event.impl.MousePressEvent;
@@ -186,6 +186,14 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
         return isEnabled() && mc.level != null;
     }
 
+    /** Modern 卡片会取世界模糊。Classic 是纯色底，不采。 */
+    public static boolean wantsBackdrop() {
+        MusicWidgetOverlay overlay = get();
+        if (!overlay.hudVisible()) return false;
+        com.ylmac.adapt.features.module.impl.render.MusicWidgetModule m = module();
+        return m != null && m.getStyle() == com.ylmac.adapt.features.module.impl.render.MusicWidgetModule.Style.MODERN;
+    }
+
     @Override
     public void setHudPos(float x, float y) {
         posX = x;
@@ -312,7 +320,7 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
             float[] r = hitRects[i];
             if (r == null) continue;
             if (mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3]) {
-                PlayerController pc = QplayerScreen.getPlayerController();
+                PlayerController pc = AdaptScreen.getPlayerController();
                 if (pc == null) return false;
                 switch (hitActions[i]) {
                     case "prev" -> pc.prev();
@@ -338,10 +346,13 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
             hitActions = new String[0];
             return;
         }
+        Probe.begin("hud.music");
         try {
             render(g);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[MusicWidget] render error: {}", t.toString());
+            AdaptClient.LOGGER.warn("[MusicWidget] render error: {}", t.toString());
+        } finally {
+            Probe.end("hud.music");
         }
     }
 
@@ -370,7 +381,7 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
         canvas.translate(SHADOW_MARGIN, SHADOW_MARGIN);   // 设计坐标不变，四周留给投影/bloom
 
         Map<String, String> sc = colorScheme();   // World / Cover（设置里切）
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         clearHitRects();
         switch (layoutFor()) {
             case ONE_BY_ONE -> drawOneByOne(canvas, sc, pc);
@@ -682,23 +693,22 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
         // 圆角用各布局原来的 r。
         // 1) 影子（积分榜的 BLOOM 队列 = Themes.rE() 黑 190）
         try {
-            io.github.humbleui.skija.ImageFilter blur = io.github.humbleui.skija.ImageFilter.makeBlur(
-                    6f, 6f, io.github.humbleui.skija.FilterTileMode.DECAL);
+            io.github.humbleui.skija.ImageFilter blur = CachedBlur.of(
+                    6f, io.github.humbleui.skija.FilterTileMode.DECAL);
             Paint lp = new Paint().setImageFilter(blur);
             c.saveLayer(Rect.makeXYWH(-24, -24, w + 48, h + 48), lp);
             paint.setColor(0xC0000000);
             c.drawRRect(RRect.makeXYWH(1, 1, w - 2, h - 2, r), paint);
             c.restore();
             lp.close();
-            blur.close();
         } catch (Throwable ignored) {
         }
         // 2) bloom：主题/封面主色，模糊 20、alpha 0x99。
         //    ⚠ 用 DIFFERENCE 裁掉卡片区域 → 光晕只出现在卡片**外面**
         //      （否则卡片是半透明的，彩色光晕会透上来"叠在卡片上"）。
         try {
-            io.github.humbleui.skija.ImageFilter blur = io.github.humbleui.skija.ImageFilter.makeBlur(
-                    20f, 20f, io.github.humbleui.skija.FilterTileMode.DECAL);
+            io.github.humbleui.skija.ImageFilter blur = CachedBlur.of(
+                    20f, io.github.humbleui.skija.FilterTileMode.DECAL);
             Paint lp = new Paint().setImageFilter(blur);
             int saveOuter = c.save();
             c.clipRRect(RRect.makeXYWH(0, 0, w, h, r), io.github.humbleui.skija.ClipMode.DIFFERENCE, true);
@@ -708,7 +718,6 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
             c.restore();
             c.restoreToCount(saveOuter);
             lp.close();
-            blur.close();
         } catch (Throwable ignored) {
         }
         // 3) 毛玻璃 + 半透明流体背景（裁到圆角）
@@ -716,7 +725,7 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
         c.clipRRect(RRect.makeXYWH(0, 0, w, h, r), io.github.humbleui.skija.ClipMode.INTERSECT, true);
         // 3a) 毛玻璃（本帧共享截帧，和积分榜/模块列表同一套映射）
         try {
-            io.github.humbleui.skija.Image bd = BackdropBlurCapture.getBlurredImage(24f);
+            io.github.humbleui.skija.Image bd = BackdropBlurCapture.getBlurredImage();
             if (bd != null) {
                 try {
                     Minecraft mc = Minecraft.getInstance();
@@ -741,7 +750,7 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
         try {
             if (fluidCtx == null) fluidCtx = GpuContextHelper.getOrCreateContext();
             if (fluidBg == null) fluidBg = new com.ylmac.adapt.features.music.lyric.skia.FluidBackground(System.nanoTime());
-            PlayerController pc = QplayerScreen.getPlayerController();
+            PlayerController pc = AdaptScreen.getPlayerController();
             byte[] cover = pc == null ? null : pc.coverBytes.peek();
             String key = pc == null ? "" : (String.valueOf(pc.title.peek()) + "|" + pc.artist.peek());
             if (!key.equals(fluidTrackKey)) fluidTrackKey = key;
@@ -918,7 +927,7 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
     }
 
     private Image coverImage() {
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         byte[] bytes = pc == null ? null : pc.coverBytes.peek();
         if (bytes == null || bytes.length == 0) {
             return null;
@@ -984,7 +993,7 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
      */
     /** 封面取色方案（供时钟组件复用）；取不到返回 null。 */
     public static Map<String, String> coverSchemeFromCover() {
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         byte[] bytes = pc == null ? null : pc.coverBytes.peek();
         if (bytes == null || bytes.length == 0) return null;
         if (bytes == coverSchemeBytes && coverSchemeCache != null) return coverSchemeCache;
@@ -1003,7 +1012,7 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
      */
     public static Map<String, String> colorScheme(boolean useCover) {
         if (!useCover) return themeScheme();
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         byte[] bytes = pc == null ? null : pc.coverBytes.peek();
         if (bytes == null || bytes.length == 0) return themeScheme();
         if (bytes == coverSchemeBytes && coverSchemeCache != null) return coverSchemeCache;
@@ -1045,13 +1054,13 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
             int seed = (int) (((r / 64) << 16) | ((gg / 64) << 8) | (b / 64));
             boolean dark = true;
             try {
-                Object inst = io.github.timer_err.qml4j.runtime.color.StyleManager.__instance();
-                if (inst instanceof io.github.timer_err.qml4j.runtime.color.StyleManager sm) {
+                Object inst = com.ylmac.adapt.theme.StyleManager.__instance();
+                if (inst instanceof com.ylmac.adapt.theme.StyleManager sm) {
                     dark = Boolean.TRUE.equals(sm.isDarkTheme.peek());
                 }
             } catch (Throwable ignored) {
             }
-            return io.github.timer_err.qml4j.runtime.color.Scheme.generate(seed, dark);
+            return com.ylmac.adapt.theme.color.Scheme.generate(seed, dark);
         } catch (Throwable t) {
             return null;
         }
@@ -1060,8 +1069,8 @@ public final class MusicWidgetOverlay implements HudElement, MovableHud {
     @SuppressWarnings("unchecked")
     private static Map<String, String> themeScheme() {
         try {
-            Object inst = io.github.timer_err.qml4j.runtime.color.StyleManager.__instance();
-            if (inst instanceof io.github.timer_err.qml4j.runtime.color.StyleManager sm) {
+            Object inst = com.ylmac.adapt.theme.StyleManager.__instance();
+            if (inst instanceof com.ylmac.adapt.theme.StyleManager sm) {
                 Object scheme = sm.currentScheme.peek();
                 if (scheme instanceof Map<?, ?> m) {
                     return (Map<String, String>) m;

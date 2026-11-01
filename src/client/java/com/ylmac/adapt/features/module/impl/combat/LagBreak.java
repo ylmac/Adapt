@@ -248,8 +248,7 @@ public class LagBreak extends Module {
         if (mc.player == null) return false;
         int key = cancelKey.getValue();
         if (key <= 0) return false;
-        return com.mojang.blaze3d.platform.InputConstants.isKeyDown(
-                mc.getWindow(), key);
+        return com.mojang.blaze3d.platform.InputConstants.isKeyDown(key);
     }
 
     /** 玩家当前水平速度（Rise MoveUtil.speed()） */

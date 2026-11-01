@@ -1,18 +1,18 @@
 package com.ylmac.adapt.render;
 
-import com.mojang.blaze3d.GpuFormat;
+import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
+import com.mojang.renderpearl.api.pipeline.BlendFunction;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.pipeline.UniformType;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.FilterMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
@@ -47,9 +47,9 @@ public final class ReimaginedCloudRenderer {
     private static final int CLOUD_TARGET_USAGE = 15;
 
     private static final BindGroupLayout CLOUD_LAYOUT = BindGroupLayout.builder()
-            .withSampler("SceneSampler")
-            .withSampler("OpaqueDepthSampler")
-            .withSampler("CloudDensitySampler")
+            .withUniform("SceneSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("OpaqueDepthSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("CloudDensitySampler", UniformType.COMBINED_IMAGE_SAMPLER)
             .withUniform("CloudFrame", UniformType.UNIFORM_BUFFER)
             .withUniform("AdaptLighting", UniformType.UNIFORM_BUFFER)
             .build();
@@ -60,14 +60,14 @@ public final class ReimaginedCloudRenderer {
             .withFragmentShader(CLOUD_SHADER_ID)
             .withBindGroupLayout(CLOUD_LAYOUT)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withPrimitiveTopology(com.mojang.blaze3d.PrimitiveTopology.TRIANGLES)
+            .withPrimitiveTopology(com.mojang.renderpearl.api.pipeline.PrimitiveTopology.TRIANGLES)
             .build();
 
     private static final ByteBuffer CLOUD_FRAME = ByteBuffer.allocateDirect(CLOUD_FRAME_SIZE)
             .order(ByteOrder.nativeOrder());
 
     private static TextureTarget opaqueSnapshot;
-    private static com.mojang.blaze3d.buffers.GpuBuffer cloudFrameBuffer;
+    private static com.mojang.renderpearl.api.buffers.GpuBuffer cloudFrameBuffer;
     private static int frameIndex;
     private static boolean frameReady;
 
@@ -111,7 +111,7 @@ public final class ReimaginedCloudRenderer {
      * Main color/depth are copied first to avoid sampling from an attachment being written.
      */
     public static void renderAfterOpaque(com.mojang.blaze3d.pipeline.RenderTarget mainTarget) {
-        if (!frameReady || mainTarget == null || !mainTarget.useDepth || mainTarget.getDepthTexture() == null) {
+        if (!frameReady || mainTarget == null || !mainTarget.hasDepth() || mainTarget.getDepthTexture() == null) {
             return;
         }
         if (!RenderSystem.isOnRenderThread()) {
@@ -129,14 +129,14 @@ public final class ReimaginedCloudRenderer {
         try (RenderPass pass = encoder.createRenderPass(
                 () -> "Complementary Reimagined deferred clouds",
                 mainTarget.getColorTextureView(), Optional.empty(), null, OptionalDouble.empty())) {
-            pass.setPipeline(CLOUD_PIPELINE);
+            pass.setPipeline(RenderSystem.getCompiledPipeline(CLOUD_PIPELINE));
             pass.setUniform("CloudFrame", cloudFrameBuffer);
             AdaptLightingUniform.bind(pass);
-            pass.bindTexture("SceneSampler", opaqueSnapshot.getColorTextureView(),
+            pass.setUniform("SceneSampler", opaqueSnapshot.getColorTextureView(),
                     RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
-            pass.bindTexture("OpaqueDepthSampler", opaqueSnapshot.getDepthTextureView(),
+            pass.setUniform("OpaqueDepthSampler", opaqueSnapshot.getDepthTextureView(),
                     RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-            pass.bindTexture("CloudDensitySampler", density.getTextureView(), density.getSampler());
+            pass.setUniform("CloudDensitySampler", density.getTextureView(), density.getSampler());
             pass.draw(3, 1, 0, 0);
         }
     }
@@ -156,7 +156,7 @@ public final class ReimaginedCloudRenderer {
     private static void ensureSnapshot(int width, int height) {
         if (opaqueSnapshot == null) {
             opaqueSnapshot = new TextureTarget("adaptclient_reimagined_cloud_snapshot", width, height,
-                    true, GpuFormat.RGBA8_UNORM);
+                    GpuFormat.RGBA8_UNORM, GpuFormat.D32_FLOAT);
         } else if (opaqueSnapshot.width != width || opaqueSnapshot.height != height) {
             opaqueSnapshot.resize(width, height);
         }
@@ -166,8 +166,8 @@ public final class ReimaginedCloudRenderer {
         if (cloudFrameBuffer == null) {
             GpuDevice device = RenderSystem.getDevice();
             cloudFrameBuffer = device.createBuffer(() -> "Reimagined CloudFrame UBO",
-                    com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST
-                            | com.mojang.blaze3d.buffers.GpuBuffer.USAGE_UNIFORM,
+                    com.mojang.renderpearl.api.buffers.GpuBuffer.USAGE_COPY_DST
+                            | com.mojang.renderpearl.api.buffers.GpuBuffer.USAGE_UNIFORM,
                     CLOUD_FRAME_SIZE);
         }
     }

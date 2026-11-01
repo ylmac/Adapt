@@ -1,18 +1,18 @@
 package com.ylmac.adapt.render;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderPassDescriptor;
+import com.mojang.renderpearl.api.pipeline.UniformType;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import net.minecraft.resources.Identifier;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
@@ -58,16 +58,16 @@ public final class DeferredGBuffer {
     private static final int DEBUG_MODE = Integer.getInteger("adapt.debugGBuffer", 0);
 
     private static final BindGroupLayout LIGHT_LAYOUT = BindGroupLayout.builder()
-            .withSampler("GB0Sampler")
-            .withSampler("GB1Sampler")
-            .withSampler("GB2Sampler")
-            .withSampler("GB3Sampler")
-            .withSampler("GB4Sampler")
-            .withSampler("GB5Sampler")
-            .withSampler("MainColorSampler")
-            .withSampler("MainDepthSampler")
-            .withSampler("ShadowMapSampler")
-            .withSampler("SkyOcclusionSampler")
+            .withUniform("GB0Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB1Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB2Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB3Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB4Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB5Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("MainColorSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("MainDepthSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("ShadowMapSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("SkyOcclusionSampler", UniformType.COMBINED_IMAGE_SAMPLER)
             .withUniform("AdaptLighting", UniformType.UNIFORM_BUFFER)
             .withUniform("ShadowFrame", UniformType.UNIFORM_BUFFER)
             // 体素遮挡场（方块光阴影 + 玻璃遮挡）。26.2 无 3D 纹理，用 texel
@@ -83,13 +83,13 @@ public final class DeferredGBuffer {
             .build();
 
     private static final BindGroupLayout DEBUG_LAYOUT = BindGroupLayout.builder()
-            .withSampler("GB0Sampler")
-            .withSampler("GB1Sampler")
-            .withSampler("GB2Sampler")
-            .withSampler("GB3Sampler")
-            .withSampler("GB4Sampler")
-            .withSampler("GB5Sampler")
-            .withSampler("MainColorSampler")
+            .withUniform("GB0Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB1Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB2Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB3Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB4Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB5Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("MainColorSampler", UniformType.COMBINED_IMAGE_SAMPLER)
             .withUniform("DebugConfig", UniformType.UNIFORM_BUFFER)
             .build();
 
@@ -105,7 +105,7 @@ public final class DeferredGBuffer {
                     GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL))
             .withColorTargetState(1, new ColorTargetState(Optional.empty(),
                     GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL))
-            .withPrimitiveTopology(com.mojang.blaze3d.PrimitiveTopology.TRIANGLES)
+            .withPrimitiveTopology(com.mojang.renderpearl.api.pipeline.PrimitiveTopology.TRIANGLES)
             .build();
 
     private static final RenderPipeline DEBUG_PIPELINE = RenderPipeline.builder()
@@ -115,7 +115,7 @@ public final class DeferredGBuffer {
             .withBindGroupLayout(DEBUG_LAYOUT)
             .withColorTargetState(new ColorTargetState(Optional.empty(),
                     GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL))
-            .withPrimitiveTopology(com.mojang.blaze3d.PrimitiveTopology.TRIANGLES)
+            .withPrimitiveTopology(com.mojang.renderpearl.api.pipeline.PrimitiveTopology.TRIANGLES)
             .build();
 
     private static GpuTexture gb0;
@@ -137,7 +137,7 @@ public final class DeferredGBuffer {
      * submitRenderPass 发出，字节码实证），结果未定义。必须先拷再采。
      */
     private static TextureTarget mainDepthSnapshot;
-    private static com.mojang.blaze3d.buffers.GpuBuffer debugConfigBuffer;
+    private static com.mojang.renderpearl.api.buffers.GpuBuffer debugConfigBuffer;
     private static boolean gbufferNeedsClear = true;
     private static int width;
     private static int height;
@@ -189,19 +189,18 @@ public final class DeferredGBuffer {
         int w = mainDepthView.getWidth(0);
         int h = mainDepthView.getHeight(0);
         ensureResources(w, h);
-        RenderPassDescriptor descriptor = RenderPassDescriptor.create(label);
         Optional<Vector4fc> clear = gbufferNeedsClear ? Optional.of(CLEAR_ZERO) : Optional.empty();
-        descriptor
+        gbufferNeedsClear = false;
+        RenderPassDescriptor descriptor = RenderPassDescriptor.builder(label)
                 .withColorAttachment(gb0View, clear)
                 .withColorAttachment(gb1View, clear)
                 .withColorAttachment(gb2View, clear)
                 .withColorAttachment(gb3View, clear)
                 .withColorAttachment(gb4View, clear)
-                .withColorAttachment(gb5View, clear);
-        gbufferNeedsClear = false;
-        descriptor
+                .withColorAttachment(gb5View, clear)
                 .withDepthAttachment(mainDepthView, OptionalDouble.empty())
-                .withRenderArea(new com.mojang.blaze3d.systems.RenderPass.RenderArea(0, 0, w, h));
+                .withRenderArea(new com.mojang.renderpearl.api.commands.RenderPass.RenderArea(0, 0, w, h))
+                .build();
         return encoder.createRenderPass(descriptor);
     }
 
@@ -235,7 +234,7 @@ public final class DeferredGBuffer {
         // 采样主深度属于 attachment 自读（26.2 无校验也无 barrier，
         // VulkanCommandEncoder.memoryBarrier 只在 submitRenderPass 发；字节码
         // 实证），必须拷出来再采样。深度用于判断实体是否画在地形之上。
-        if (mainTarget.useDepth && mainTarget.getDepthTexture() != null) {
+        if (mainTarget.hasDepth() && mainTarget.getDepthTexture() != null) {
             encoder.copyTextureToTexture(mainTarget.getDepthTexture(), mainDepthSnapshot.getDepthTexture(),
                     0, 0, 0, 0, 0, mainTarget.width, mainTarget.height);
         }
@@ -248,7 +247,7 @@ public final class DeferredGBuffer {
             try (RenderPass pass = encoder.createRenderPass(
                     () -> "Adapt deferred debug",
                     mainTarget.getColorTextureView(), Optional.empty(), null, OptionalDouble.empty())) {
-                pass.setPipeline(DEBUG_PIPELINE);
+                pass.setPipeline(RenderSystem.getCompiledPipeline(DEBUG_PIPELINE));
                 ensureDebugConfig();
                 pass.setUniform("DebugConfig", debugConfigBuffer);
                 bindGBuffer(pass, false);
@@ -257,13 +256,14 @@ public final class DeferredGBuffer {
         } else {
             GpuTextureView[] targets =
                     AdaptDirectLighting.lightingTargets(mainTarget.width, mainTarget.height);
-            RenderPassDescriptor descriptor = RenderPassDescriptor.create(() -> "Adapt deferred lighting");
-            descriptor.withColorAttachment(targets[0], Optional.of(CLEAR_ZERO))
+            RenderPassDescriptor descriptor = RenderPassDescriptor.builder(() -> "Adapt deferred lighting")
+                    .withColorAttachment(targets[0], Optional.of(CLEAR_ZERO))
                     .withColorAttachment(targets[1], Optional.of(CLEAR_ZERO))
-                    .withRenderArea(new com.mojang.blaze3d.systems.RenderPass.RenderArea(
-                            0, 0, mainTarget.width, mainTarget.height));
+                    .withRenderArea(new com.mojang.renderpearl.api.commands.RenderPass.RenderArea(
+                            0, 0, mainTarget.width, mainTarget.height))
+                    .build();
             try (RenderPass pass = encoder.createRenderPass(descriptor)) {
-                pass.setPipeline(LIGHT_PIPELINE);
+                pass.setPipeline(RenderSystem.getCompiledPipeline(LIGHT_PIPELINE));
                 AdaptLightingUniform.bind(pass);
                 // 太阳方向影：ShadowFrame UBO + shadow map。G-buffer 接管后
                 // 地形几何阶段不再算光照，阴影必须在这里接收。
@@ -292,15 +292,15 @@ public final class DeferredGBuffer {
 
     private static void bindGBuffer(RenderPass pass, boolean withDepth) {
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
-        pass.bindTexture("GB0Sampler", gb0View, nearest);
-        pass.bindTexture("GB1Sampler", gb1View, nearest);
-        pass.bindTexture("GB2Sampler", gb2View, nearest);
-        pass.bindTexture("GB3Sampler", gb3View, nearest);
-        pass.bindTexture("GB4Sampler", gb4View, nearest);
-        pass.bindTexture("GB5Sampler", gb5View, nearest);
-        pass.bindTexture("MainColorSampler", mainColorSnapshot.getColorTextureView(), nearest);
+        pass.setUniform("GB0Sampler", gb0View, nearest);
+        pass.setUniform("GB1Sampler", gb1View, nearest);
+        pass.setUniform("GB2Sampler", gb2View, nearest);
+        pass.setUniform("GB3Sampler", gb3View, nearest);
+        pass.setUniform("GB4Sampler", gb4View, nearest);
+        pass.setUniform("GB5Sampler", gb5View, nearest);
+        pass.setUniform("MainColorSampler", mainColorSnapshot.getColorTextureView(), nearest);
         if (withDepth) {
-            pass.bindTexture("MainDepthSampler", mainDepthSnapshot.getDepthTextureView(), nearest);
+            pass.setUniform("MainDepthSampler", mainDepthSnapshot.getDepthTextureView(), nearest);
         }
     }
 
@@ -382,7 +382,7 @@ public final class DeferredGBuffer {
         if (mainColorSnapshot == null) {
             // 主 target 颜色为 RGBA8_UNORM（与云 pass 快照同源），blit 必须同格式
             mainColorSnapshot = new TextureTarget("adaptclient_gbuffer_main_snapshot", w, h,
-                    false, GpuFormat.RGBA8_UNORM);
+                    GpuFormat.RGBA8_UNORM, null);
         } else if (mainColorSnapshot.width != w || mainColorSnapshot.height != h) {
             mainColorSnapshot.resize(w, h);
         }
@@ -390,7 +390,7 @@ public final class DeferredGBuffer {
             // useDepth=true：只用它的深度附件，颜色附件闲置（TextureTarget 不支持
             // 只建深度）。格式与主 target 深度一致由 TextureTarget 内部保证。
             mainDepthSnapshot = new TextureTarget("adaptclient_gbuffer_depth_snapshot", w, h,
-                    true, GpuFormat.RGBA8_UNORM);
+                    GpuFormat.RGBA8_UNORM, GpuFormat.D32_FLOAT);
         } else if (mainDepthSnapshot.width != w || mainDepthSnapshot.height != h) {
             mainDepthSnapshot.resize(w, h);
         }
@@ -402,8 +402,8 @@ public final class DeferredGBuffer {
             data.putInt(0, DEBUG_MODE);
             debugConfigBuffer = RenderSystem.getDevice().createBuffer(
                     () -> "Adapt G-buffer debug config",
-                    com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST
-                            | com.mojang.blaze3d.buffers.GpuBuffer.USAGE_UNIFORM,
+                    com.mojang.renderpearl.api.buffers.GpuBuffer.USAGE_COPY_DST
+                            | com.mojang.renderpearl.api.buffers.GpuBuffer.USAGE_UNIFORM,
                     16);
             RenderSystem.getDevice().createCommandEncoder().writeToBuffer(debugConfigBuffer.slice(), data);
         }

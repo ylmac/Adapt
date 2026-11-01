@@ -17,6 +17,7 @@ import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * AutoStuck 虚空自救——移植自 Rise 6.9.5 AutoStuck（含珍珠模式），适配 Fabric 26.2。
@@ -370,7 +371,7 @@ public class AutoStuck extends Module {
         ItemStack stack = player.getMainHandItem();
         if (!stack.isEmpty() && stack.is(Items.ENDER_PEARL)) {
             mc.gameMode.useItem(player, InteractionHand.MAIN_HAND);
-            player.swing(InteractionHand.MAIN_HAND);
+            player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         }
         inv.setSelectedSlot(old);
         mc.getConnection().send(new ServerboundSetCarriedItemPacket(old));

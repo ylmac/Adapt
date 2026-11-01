@@ -504,7 +504,7 @@ public class ManualKBDisplacement extends Module {
         if (!s.equals(this.lastDebugMessage) || mc.player.tickCount - this.lastDebugTick >= 8) {
             this.lastDebugMessage = s;
             this.lastDebugTick = mc.player.tickCount;
-            com.ylmac.adapt.QplayerModClient.LOGGER.info("[KB Displacement] {}", s);
+            com.ylmac.adapt.AdaptClient.LOGGER.info("[KB Displacement] {}", s);
         }
     }
 

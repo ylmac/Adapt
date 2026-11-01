@@ -1,6 +1,6 @@
 package com.ylmac.adapt.render;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.module.impl.render.ChatModule;
 import com.ylmac.adapt.injection.mixins.ChatComponentAccessor;
 import com.ylmac.adapt.injection.mixins.ChatScreenAccessor;
@@ -96,6 +96,13 @@ public final class ChatOverlay implements HudElement, MovableHud {
 
     private static boolean isEnabled() {
         return ChatModule.overlayEnabled();
+    }
+
+    /** 开着背景、而且这一帧真有字要画时才采世界模糊。 */
+    public static boolean wantsBackdrop() {
+        if (!isEnabled() || Minecraft.getInstance().level == null || lines().isEmpty()) return false;
+        ChatModule m = module();
+        return m == null || m.background();
     }
 
     public void onModuleStateChanged() {
@@ -242,10 +249,13 @@ public final class ChatOverlay implements HudElement, MovableHud {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, DeltaTracker dt) {
         if (!isEnabled()) return;
+        Probe.begin("hud.chat");
         try {
             render(g);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[Chat] render error: {}", t.toString());
+            AdaptClient.LOGGER.warn("[Chat] render error: {}", t.toString());
+        } finally {
+            Probe.end("hud.chat");
         }
     }
 
@@ -342,24 +352,23 @@ public final class ChatOverlay implements HudElement, MovableHud {
 
         Image backdrop = null;
         if (bg) {
-            backdrop = BackdropBlurCapture.getBlurredImage(24f);
+            backdrop = BackdropBlurCapture.getBlurredImage();
             if (backdrop == null && !loggedBlurUnavailable) {
                 loggedBlurUnavailable = true;
-                QplayerModClient.LOGGER.warn("[Chat] backdrop blur unavailable");
+                AdaptClient.LOGGER.warn("[Chat] backdrop blur unavailable");
             }
         }
 
         try {
             // 1) 投影（Rise 的 BLOOM 队列：Themes.rE() = 黑 alpha 190，模糊后是暗色阴影）
             try {
-                ImageFilter blur = ImageFilter.makeBlur(6f, 6f, FilterTileMode.DECAL);
+                ImageFilter blur = CachedBlur.of(6f, FilterTileMode.DECAL);
                 Paint glowPaint = new Paint().setImageFilter(blur);
                 canvas.saveLayer(Rect.makeXYWH(-24, -24, w + 48, h + 48), glowPaint);
                 paint.setColor(0xC0000000);
                 canvas.drawRRect(RRect.makeXYWH(1, 1, w - 2, h - 2, radius), paint);
                 canvas.restore();
                 glowPaint.close();
-                blur.close();
             } catch (Throwable ignored) {
             }
 
@@ -387,14 +396,13 @@ public final class ChatOverlay implements HudElement, MovableHud {
                 canvas.translate(-cx, -cy);
 
                 try {
-                    ImageFilter blur = ImageFilter.makeBlur(6f, 6f, FilterTileMode.DECAL);
+                    ImageFilter blur = CachedBlur.of(6f, FilterTileMode.DECAL);
                     Paint glowPaint = new Paint().setImageFilter(blur);
                     canvas.saveLayer(Rect.makeXYWH(-24, boxY - 24, w + 48, inputBoxH + 48), glowPaint);
                     paint.setColor(0xC0000000);
                     canvas.drawRRect(RRect.makeXYWH(1, boxY + 1, w - 2, inputBoxH - 2, MAX_RADIUS), paint);
                     canvas.restore();
                     glowPaint.close();
-                    blur.close();
                 } catch (Throwable ignored) {
                 }
 

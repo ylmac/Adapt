@@ -54,14 +54,13 @@
     "BlobShadowMixin",
     "ParticleShadowSkipMixin",
     "PreparedFrameAccessor",
-    "SodiumTerrainUniformMixin",
     "EspRendererMixin",
     "AdaptShadowPassMixin",
-    "SodiumTerrainTargetMixin",
-    "SodiumAoDisableMixin",
-    "SodiumEmptyLightBakeMixin",
-    "SodiumBlockLightCaptureMixin",
-    "ChunkSectionsToRenderMixin"
+    "ChunkSectionsToRenderMixin",
+    "AvatarCapeMixin",
+    "LivingEntityCosmeticsMixin",
+    "OldSwingMixin",
+    "FreelookCameraMixin"
   ],
   "injectors": {
     "defaultRequire": 1

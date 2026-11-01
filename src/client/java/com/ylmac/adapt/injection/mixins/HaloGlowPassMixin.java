@@ -1,16 +1,13 @@
 package com.ylmac.adapt.injection.mixins;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.resource.ResourceHandle;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.ylmac.adapt.render.HaloGlowRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LevelTargetBundle;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher.PreparedFrame;
-import net.minecraft.client.renderer.state.level.LevelRenderState;
-import net.minecraft.util.profiling.ProfilerFiller;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -18,6 +15,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * 26.3：实体通道在 {@code RenderPass.close} 之后才关掉。清屏必须等这次 close，
+ * 否则 {@code clearColorAndDepthTextures} 会在通道还开着时再开一次。
+ */
 @Mixin(LevelRenderer.class)
 public abstract class HaloGlowPassMixin {
 
@@ -25,46 +26,41 @@ public abstract class HaloGlowPassMixin {
     @Final
     private LevelTargetBundle targets;
 
-    @Inject(
-            method = "lambda$addMainPass$0(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;"
-                    + "Lnet/minecraft/client/renderer/state/level/LevelRenderState;"
-                    + "Lnet/minecraft/util/profiling/ProfilerFiller;"
+    private static final String ADD_MAIN_PASS_LAMBDA =
+            "lambda$addMainPass$0(Lcom/mojang/renderpearl/api/buffers/GpuBufferSlice;Z"
                     + "Lnet/minecraft/client/renderer/chunk/ChunkSectionsToRender;"
-                    + "Lcom/mojang/blaze3d/resource/ResourceHandle;"
-                    + "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher$PreparedFrame;"
-                    + "Lcom/mojang/blaze3d/resource/ResourceHandle;"
-                    + "Lcom/mojang/blaze3d/resource/ResourceHandle;"
-                    + "Lcom/mojang/blaze3d/resource/ResourceHandle;"
-                    + "Lcom/mojang/blaze3d/resource/ResourceHandle;)V",
+                    + "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher$PreparedFrame;ZZ)V";
+
+    @Inject(
+            method = ADD_MAIN_PASS_LAMBDA,
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher$PreparedFrame;"
-                            + "executeTranslucent()V"
+                    target = "Lcom/mojang/renderpearl/api/commands/RenderPass;close()V",
+                    ordinal = 0,
+                    shift = At.Shift.AFTER
             )
     )
     private void adapt_prepareHaloMask(
             GpuBufferSlice fog,
-            LevelRenderState levelRenderState,
-            ProfilerFiller profiler,
+            boolean improvedTransparency,
             ChunkSectionsToRender chunkSectionsToRender,
-            ResourceHandle entityOutline,
             PreparedFrame preparedFrame,
-            ResourceHandle translucent,
-            ResourceHandle mainHandle,
-            ResourceHandle itemEntity,
-            ResourceHandle particles,
+            boolean hasAlwaysOnTop,
+            boolean alwaysOnTopFlag,
             CallbackInfo ci
     ) {
         if (HaloGlowRenderer.hasMask()) {
-            HaloGlowRenderer.prepareMask((RenderTarget) mainHandle.get());
+            HaloGlowRenderer.prepareMask((RenderTarget) this.targets.main.get());
         }
     }
 
-    @Inject(method = "addAlwaysOnTopPass", at = @At("RETURN"))
+    @Inject(method = "addMainPass", at = @At("RETURN"))
     private void adapt_addHaloGlowPass(
             FrameGraphBuilder graph,
             PreparedFrame preparedFrame,
             GpuBufferSlice fog,
+            ChunkSectionsToRender sections,
+            boolean improvedTransparency,
             CallbackInfo ci
     ) {
         if (!HaloGlowRenderer.hasMask()) {

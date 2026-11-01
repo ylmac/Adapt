@@ -123,12 +123,23 @@ public final class RiseFont {
             } else {
                 file = "product_sans_regular.ttf";
             }
-            try (java.io.InputStream in = RiseFont.class.getResourceAsStream("/assets/adaptclient/qml/fonts/" + file)) {
-                if (in == null) return null;
-                byte[] data = in.readAllBytes();
-                return io.github.humbleui.skija.FontMgr.getDefault().makeFromData(
-                        io.github.humbleui.skija.Data.makeFromBytes(data));
+            // 与 Typefaces 同序：qml-retired → qml → fonts
+            String[] dirs = {
+                    "/assets/adaptclient/qml-retired/fonts/",
+                    "/assets/adaptclient/qml/fonts/",
+                    "/assets/adaptclient/fonts/",
+            };
+            for (String dir : dirs) {
+                try (java.io.InputStream in = RiseFont.class.getResourceAsStream(dir + file)) {
+                    if (in == null) continue;
+                    byte[] data = in.readAllBytes();
+                    if (data == null || data.length == 0) continue;
+                    return io.github.humbleui.skija.FontMgr.getDefault().makeFromData(
+                            io.github.humbleui.skija.Data.makeFromBytes(data));
+                } catch (Exception ignored) {
+                }
             }
+            return null;
         } catch (Exception e) {
             return null;
         }

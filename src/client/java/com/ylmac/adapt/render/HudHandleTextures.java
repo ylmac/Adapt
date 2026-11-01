@@ -1,6 +1,6 @@
 package com.ylmac.adapt.render;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.Paint;
 import io.github.humbleui.skija.PaintMode;
@@ -69,7 +69,7 @@ final class HudHandleTextures {
             topLeft = bake(true);
             bottomRight = bake(false);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[HUD] handle bake failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[HUD] handle bake failed: {}", t.toString());
         }
     }
 

@@ -21,6 +21,7 @@ import net.minecraft.world.item.DyeColor;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * Breaker —— 自动破坏周围指定的方块（默认床）。
@@ -226,7 +227,7 @@ public class Breaker extends Module {
             mc.gameMode.startDestroyBlock(target, Direction.UP);
             sendSilently(new ServerboundPlayerActionPacket(
                     ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, target, Direction.UP));
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         }
 
         // 3. 挖掘推进：每 tick 维持进度，直到方块消失
@@ -237,7 +238,7 @@ public class Breaker extends Module {
             mc.gameMode.stopDestroyBlock();
             sendSilently(new ServerboundPlayerActionPacket(
                     ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, target, Direction.UP));
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
             stopDigging();
             target = null;
             cooldownTicks = 2;

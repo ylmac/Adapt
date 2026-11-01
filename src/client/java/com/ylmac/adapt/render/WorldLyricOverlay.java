@@ -17,7 +17,7 @@ import com.ylmac.adapt.config.DesktopSettings;
 import com.ylmac.adapt.features.music.lyric.skia.LyricCompositor;
 import com.ylmac.adapt.features.music.lyric.skia.LyricRenderer;
 import com.ylmac.adapt.features.music.PlayerController;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
 /**
  * 世界内歌词（HUD 层）：在屏幕右下方渲染当前播放歌词。
@@ -56,7 +56,7 @@ public final class WorldLyricOverlay implements HudElement {
     private static final float COL_TOP = PAD;
     private static final float COL_H = SURF_H - 2f * PAD;
 
-    // 显示尺寸按屏幕宽度比例（与 QplayerScreen 主界面同理念：相对屏幕比例，
+    // 显示尺寸按屏幕宽度比例（与 AdaptScreen 主界面同理念：相对屏幕比例，
     // 分辨率变化时占比不变）；0.45 ≈ 屏幕面积四分之一（用户指定的大小）
     private static final float REL_SCALE = 0.45f;
 
@@ -103,17 +103,17 @@ public final class WorldLyricOverlay implements HudElement {
             surf = new MinecraftSurfaceBackend("world_lyric", SURF_W, SURF_H, deviceScale);
             texId = surf.getTextureId();
             lyricRenderer = new WorldLyricRenderer();
-            QplayerModClient.LOGGER.info("[QPlayer] WorldLyricOverlay surface ready");
+            AdaptClient.LOGGER.info("[QPlayer] WorldLyricOverlay surface ready");
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[QPlayer] WorldLyricOverlay init failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[QPlayer] WorldLyricOverlay init failed: {}", t.toString());
             surf = null;
         }
     }
 
     private boolean shouldShow() {
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         if (pc == null) return false;
-        DesktopSettings st = QplayerScreen.getDesktopSettings();
+        DesktopSettings st = AdaptScreen.getDesktopSettings();
         if (st != null && !st.showLyrics()) return false;
         List<LyricLine> lyrics = pc.lyrics.get();
         return lyrics != null && !lyrics.isEmpty();
@@ -121,14 +121,14 @@ public final class WorldLyricOverlay implements HudElement {
 
     /** 渲染歌词到 GPU surface（完整动画版世界歌词渲染器，左/中/右对齐可配） */
     private void renderLyrics() {
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         List<LyricLine> lyrics = pc.lyrics.get();
         if (lyrics != lastLyrics) {
             lastLyrics = lyrics;
             lyricRenderer.setLyrics(lyrics);
         }
         // 世界歌词独立设置：对齐 / 字号 / 描边颜色（DesktopSettings.worldLyric*）
-        DesktopSettings st = QplayerScreen.getDesktopSettings();
+        DesktopSettings st = AdaptScreen.getDesktopSettings();
         if (st != null) {
             lyricRenderer.setAlignMode(st.worldLyricAlign.get() != null
                     ? st.worldLyricAlign.get().intValue() : 2);
@@ -150,12 +150,23 @@ public final class WorldLyricOverlay implements HudElement {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, DeltaTracker dt) {
+        Probe.begin("hud.worldLyric");
+        try {
+            extractWorldLyric(g, dt);
+        } finally {
+            Probe.end("hud.worldLyric");
+        }
+    }
+
+    private void extractWorldLyric(GuiGraphicsExtractor g, DeltaTracker dt) {
         // 界面关闭时由 HUD 循环推进播放进度（界面打开时 HUD 不渲染，由界面循环 pump）
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         if (pc != null) pc.pump();
 
         if (!shouldShow()) return;
         Minecraft mc = Minecraft.getInstance();
+        // 播放器/任何 GUI 打开时世界歌词不画：否则和面板内歌词叠两份，还多一张大 RT
+        if (mc.gui.screen() != null) return;
         int scrW = mc.getWindow().getGuiScaledWidth();
         int scrH = mc.getWindow().getGuiScaledHeight();
         ensureSurface(scrW);
@@ -164,7 +175,7 @@ public final class WorldLyricOverlay implements HudElement {
         try {
             renderLyrics();
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[QPlayer] world lyric render error: {}", t.toString());
+            AdaptClient.LOGGER.warn("[QPlayer] world lyric render error: {}", t.toString());
             return;
         }
 
@@ -176,7 +187,7 @@ public final class WorldLyricOverlay implements HudElement {
         // 一次性定位日志：确认实际坐标与文字带预期位置（供后续调参对照）
         if (!logged) {
             logged = true;
-            QplayerModClient.LOGGER.info("[QPlayer] WorldLyric pos: scrW={} scrH={} dispW={} dispH={} x={} y={} bandTopY={} texW={} texH={}",
+            AdaptClient.LOGGER.info("[QPlayer] WorldLyric pos: scrW={} scrH={} dispW={} dispH={} x={} y={} bandTopY={} texW={} texH={}",
                     scrW, scrH, dispW, dispH, scrW - MARGIN - dispW, scrH - MARGIN - dispH,
                     (int) (scrH - MARGIN - dispH + dispH * (COL_TOP + COL_H * 0.35f) / SURF_H),
                     texW, texH);
@@ -186,7 +197,7 @@ public final class WorldLyricOverlay implements HudElement {
         // 面板水平位置跟随对齐（垂直保持底部锚定）：
         //   左对齐 → 左下角；中间 → 底部居中；右对齐 → 右下角
         int alignN = 2;
-        DesktopSettings st = QplayerScreen.getDesktopSettings();
+        DesktopSettings st = AdaptScreen.getDesktopSettings();
         if (st != null && st.worldLyricAlign.get() != null) alignN = st.worldLyricAlign.get().intValue();
         int panelX;
         switch (alignN) {

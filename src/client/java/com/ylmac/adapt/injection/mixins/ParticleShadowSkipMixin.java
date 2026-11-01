@@ -1,8 +1,10 @@
 package com.ylmac.adapt.injection.mixins;
 
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.ylmac.adapt.render.AdaptShadowMap;
 import net.minecraft.client.renderer.feature.FeatureFrameContext;
 import net.minecraft.client.renderer.feature.QuadParticleFeatureRenderer;
+import net.minecraft.client.renderer.oit.OitStage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,7 +22,7 @@ import java.util.List;
  * off.9-26 / off.36-53），所以模型/物品/方块模型都正确改道。
  * <p>
  * <b>粒子是唯一的例外</b>：{@code QuadParticleFeatureRenderer.executeGroup}
- * 自己建 pass，附件直接取
+ * 自己建 pass / 用外部 pass，附件直接取
  * {@code Minecraft.gameRenderer.mainRenderTarget().getColorTextureView()}
  * 与 {@code LevelRenderer.particlesTarget()}（字节码 off.65-103），
  * <b>完全不看 override</b>。若放它跑第二遍会有两个后果：
@@ -37,12 +39,15 @@ import java.util.List;
  * {@code SubmitNodeCollection.submitQuadParticleGroup} 把粒子提交进
  * {@code solid} 与 {@code afterTerrain} 两个 phase（字节码实证），
  * 所以 executeSolid 一定会碰到它。
+ * <p>
+ * 26.3：{@code executeGroup} 签名增加了 {@link OitStage} 与 {@link RenderPass}。
  */
 @Mixin(QuadParticleFeatureRenderer.class)
 public abstract class ParticleShadowSkipMixin {
 
     @Inject(method = "executeGroup", at = @At("HEAD"), cancellable = true)
-    private void adapt$skipParticlesInShadowPass(FeatureFrameContext context, int groupIndex,
+    private void adapt$skipParticlesInShadowPass(FeatureFrameContext context, OitStage oitStage,
+                                                 RenderPass renderPass, int groupIndex,
                                                  List<?> submits, boolean strictlyOrdered,
                                                  CallbackInfo ci) {
         if (AdaptShadowMap.isRendering()) {

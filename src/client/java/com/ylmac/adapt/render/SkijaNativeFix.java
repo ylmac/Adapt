@@ -17,7 +17,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
 public final class SkijaNativeFix {
     private static boolean loaded = false;
@@ -122,9 +122,9 @@ public final class SkijaNativeFix {
             staticLoad.setAccessible(true);
             staticLoad.invoke(null);
 
-            QplayerModClient.LOGGER.info("[QPlayer] Skija native preload OK");
+            AdaptClient.LOGGER.info("[QPlayer] Skija native preload OK");
         } catch (Exception e) {
-            QplayerModClient.LOGGER.error("[QPlayer] Skija native preload FAILED: {}", e.toString());
+            AdaptClient.LOGGER.error("[QPlayer] Skija native preload FAILED: {}", e.toString());
         }
     }
 }

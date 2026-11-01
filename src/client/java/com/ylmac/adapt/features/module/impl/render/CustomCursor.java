@@ -90,8 +90,10 @@ public final class CustomCursor extends Module {
         } finally {
             MemoryUtil.memFree(pixels);
         }
+        // 26.3 无 GLFW cursor；shim 返回 0，功能暂禁用但不崩
         if (cursorHandle == 0L) {
-            throw new IllegalStateException("GLFW.glfwCreateCursor returned 0");
+            currentKey = style.getValue() + "@" + px;
+            return;
         }
         currentKey = style.getValue() + "@" + px;
         GLFW.glfwSetCursor(mc.getWindow().handle(), cursorHandle);

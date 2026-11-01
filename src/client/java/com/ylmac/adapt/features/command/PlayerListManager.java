@@ -1,7 +1,7 @@
 package com.ylmac.adapt.features.command;
 
 import com.ylmac.adapt.config.store.AppDirs;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -79,7 +79,7 @@ public abstract class PlayerListManager {
             Files.createDirectories(file().getParent());
             Files.write(file(), String.join("\n", players).getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[{}] save failed: {}", fileName, e.toString());
+            AdaptClient.LOGGER.warn("[{}] save failed: {}", fileName, e.toString());
         }
     }
 
@@ -91,7 +91,7 @@ public abstract class PlayerListManager {
                 if (!line.trim().isEmpty()) players.add(line.trim());
             }
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("[{}] load failed: {}", fileName, e.toString());
+            AdaptClient.LOGGER.warn("[{}] load failed: {}", fileName, e.toString());
         }
     }
 }

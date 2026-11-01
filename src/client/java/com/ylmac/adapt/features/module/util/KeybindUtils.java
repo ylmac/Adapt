@@ -38,7 +38,7 @@ public class KeybindUtils {
         if (isMouseButton(keyBind)) {
             return GLFW.glfwGetMouseButton(handle, decodeMouseButton(keyBind)) == GLFW.GLFW_PRESS;
         }
-        return InputConstants.isKeyDown(mc.getWindow(), keyBind);
+        return InputConstants.isKeyDown(keyBind);
     }
 
     /** 将键位值格式化为面向用户的名称 */
@@ -47,9 +47,10 @@ public class KeybindUtils {
             return "None";
         }
         if (isMouseButton(keyBind)) {
-            return "Mouse " + (decodeMouseButton(keyBind) + 1);
+            // 26.3：鼠标按钮已是 SDL 1-based（1=左），直接显示编号
+            return "Mouse " + decodeMouseButton(keyBind);
         }
-        return InputConstants.Type.KEYSYM.getOrCreate(keyBind).getDisplayName().getString();
+        return InputConstants.Type.KEYBOARD.getOrCreate(keyBind).getDisplayName().getString();
     }
 
 }

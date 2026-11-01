@@ -46,8 +46,10 @@ public final class KeyBindUtil {
     private static int glfwKeyByName(String name) {
         if (name.length() == 1) {
             char c = name.charAt(0);
+            // SDL scancode：A..Z 连续；数字是 1..9,0（非 0..9）
             if (c >= 'A' && c <= 'Z') return GLFW.GLFW_KEY_A + (c - 'A');
-            if (c >= '0' && c <= '9') return GLFW.GLFW_KEY_0 + (c - '0');
+            if (c >= '1' && c <= '9') return GLFW.GLFW_KEY_1 + (c - '1');
+            if (c == '0') return GLFW.GLFW_KEY_0;
         }
         switch (name) {
             case "ESCAPE": case "ESC": return GLFW.GLFW_KEY_ESCAPE;
@@ -102,11 +104,26 @@ public final class KeyBindUtil {
             case "KPDECIMAL": return GLFW.GLFW_KEY_KP_DECIMAL;
             case "KPENTER": return GLFW.GLFW_KEY_KP_ENTER;
             default:
-                // F1-F35
+                // F1-F24（SDL：F1-F12 连续，F13-F24 另起一段，不能用 F1+(n-1)）
                 if (name.startsWith("F") && name.length() > 1) {
                     try {
                         int n = Integer.parseInt(name.substring(1));
-                        if (n >= 1 && n <= 24) return GLFW.GLFW_KEY_F1 + (n - 1);
+                        if (n >= 1 && n <= 24) {
+                            return switch (n) {
+                                case 1 -> GLFW.GLFW_KEY_F1; case 2 -> GLFW.GLFW_KEY_F2;
+                                case 3 -> GLFW.GLFW_KEY_F3; case 4 -> GLFW.GLFW_KEY_F4;
+                                case 5 -> GLFW.GLFW_KEY_F5; case 6 -> GLFW.GLFW_KEY_F6;
+                                case 7 -> GLFW.GLFW_KEY_F7; case 8 -> GLFW.GLFW_KEY_F8;
+                                case 9 -> GLFW.GLFW_KEY_F9; case 10 -> GLFW.GLFW_KEY_F10;
+                                case 11 -> GLFW.GLFW_KEY_F11; case 12 -> GLFW.GLFW_KEY_F12;
+                                case 13 -> GLFW.GLFW_KEY_F13; case 14 -> GLFW.GLFW_KEY_F14;
+                                case 15 -> GLFW.GLFW_KEY_F15; case 16 -> GLFW.GLFW_KEY_F16;
+                                case 17 -> GLFW.GLFW_KEY_F17; case 18 -> GLFW.GLFW_KEY_F18;
+                                case 19 -> GLFW.GLFW_KEY_F19; case 20 -> GLFW.GLFW_KEY_F20;
+                                case 21 -> GLFW.GLFW_KEY_F21; case 22 -> GLFW.GLFW_KEY_F22;
+                                case 23 -> GLFW.GLFW_KEY_F23; default -> GLFW.GLFW_KEY_F24;
+                            };
+                        }
                     } catch (NumberFormatException ignored) {}
                 }
                 return 0;

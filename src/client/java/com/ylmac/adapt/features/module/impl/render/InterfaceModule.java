@@ -3,6 +3,7 @@ package com.ylmac.adapt.features.module.impl.render;
 import com.ylmac.adapt.features.module.Category;
 import com.ylmac.adapt.features.module.Module;
 import com.ylmac.adapt.features.module.settings.impl.EnumSetting;
+import com.ylmac.adapt.render.BackdropBlurCapture;
 import com.ylmac.adapt.render.ModuleListOverlay;
 
 /**
@@ -31,8 +32,8 @@ public class InterfaceModule extends Module {
     /** 列表背景（Rise BackGroundModeValue: Off/Normal，默认 Normal） */
     public enum BackGround { OFF, NORMAL }
 
-    /** ClickGUI 样式（ADAPT = 我们现在的 QML 界面；RISE = Rise 6.9.5 风格） */
-    public enum ClickGuiStyle { ADAPT, RISE }
+    /** ClickGUI 样式（LIST = 分栏列表；ADAPT = Compose；RISE = Rise 6.9.5） */
+    public enum ClickGuiStyle { LIST, ADAPT, RISE }
 
     private final EnumSetting<InterfaceMode> modeSetting;
     private final EnumSetting<ModernColorMode> colorModeSetting;
@@ -60,23 +61,20 @@ public class InterfaceModule extends Module {
         // 列表背景（Rise BackGroundModeValue）：Normal = 磨砂玻璃底（模糊 + 黑色蒙版）
         enumSetting("BackGround", BackGround.NORMAL, bg ->
                 ModuleListOverlay.get().backgroundMode = bg.ordinal());
-        // 模糊半径（Rise Interface.blurRadius 默认 12，范围 1..30）
+        // 模糊半径（Rise 默认 12）。写入时乘 2，和 HUD 卡片的 24 是同一个数，全界面共用。
         intSetting("Blur Radius", 12, 1, 30, 1, r ->
-                ModuleListOverlay.get().blurRadius = r);
+                BackdropBlurCapture.setRadius(r * 2f));
         // 背景不透明度（Rise Interface.backgroundAlpha 默认 110；开模糊时用这个值，关模糊时 Rise 用 150）
         intSetting("Background Alpha", 110, 0, 255, 1, a ->
                 ModuleListOverlay.get().backgroundAlpha = a);
 
-        // ClickGUI 样式（默认 ADAPT = 现有界面；RISE = Rise 6.9.5 风格界面）
-        clickGuiStyle = enumSetting("Click GUI", ClickGuiStyle.ADAPT);
+        // ClickGUI 样式（默认分栏列表）
+        clickGuiStyle = enumSetting("Click GUI", ClickGuiStyle.LIST);
 
         // Shaders（Rise Interface.Shaders，默认 false）：开关 Rise GUI 的 BLOOM 发光通道
         shaders = boolSetting("Shaders", false);
 
 
-        // 左上角 logo 文字（HUD 左上角显示；默认 Pixel，可在设置里改）
-        stringSetting("左上角文字", "Pixel", v -> ModuleListOverlay.get().setLogoText(v));
-        ModuleListOverlay.get().setLogoText("Pixel");
         refreshTag();
     }
 
@@ -93,7 +91,7 @@ public class InterfaceModule extends Module {
      */
     public static boolean isDebug() {
         try {
-            com.ylmac.adapt.config.DesktopSettings ds = com.ylmac.adapt.render.QplayerScreen.getDesktopSettings();
+            com.ylmac.adapt.config.DesktopSettings ds = com.ylmac.adapt.render.AdaptScreen.getDesktopSettings();
             return ds != null && Boolean.TRUE.equals(ds.debugMode.peek());
         } catch (Throwable t) {
             return false;
@@ -109,6 +107,18 @@ public class InterfaceModule extends Module {
     public static boolean isRiseClickGui() {
         InterfaceModule m = get();
         return m != null && m.clickGuiStyle.getValue() == ClickGuiStyle.RISE;
+    }
+
+    /** 按 Click GUI 设置打开对应界面。 */
+    public static net.minecraft.client.gui.screens.Screen createClickGui() {
+        ClickGuiStyle style = ClickGuiStyle.LIST;
+        InterfaceModule m = get();
+        if (m != null && m.clickGuiStyle.getValue() != null) style = m.clickGuiStyle.getValue();
+        return switch (style) {
+            case RISE -> new com.ylmac.adapt.render.clickgui.RiseClickGuiScreen();
+            case ADAPT -> new com.ylmac.adapt.render.clickgui.ClickGuiScreen();
+            case LIST -> new com.ylmac.adapt.render.clickgui.ListClickGuiScreen();
+        };
     }
 
     /** 供渲染层/打开逻辑取当前模块实例。 */

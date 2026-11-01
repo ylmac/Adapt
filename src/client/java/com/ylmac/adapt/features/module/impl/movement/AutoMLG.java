@@ -18,6 +18,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * AutoMLG 自动落地水 —— Rise 6.9.5 AutoMLG 的逐条复刻（MC 26.2 / Fabric）。
@@ -202,7 +203,7 @@ public class AutoMLG extends Module {
         BlockHitResult bhr = (BlockHitResult) hit;
 
         // 放水：swing（C0A）+ use-item（C08 dir=255 等价）
-        player.swing(InteractionHand.MAIN_HAND);
+        player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         mc.gameMode.useItem(player, InteractionHand.MAIN_HAND);
 
         this.waterPos = getPlacedPos(bhr);

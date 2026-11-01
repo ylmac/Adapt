@@ -1,17 +1,17 @@
 package com.ylmac.adapt.render;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.UniformType;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import net.minecraft.resources.Identifier;
 
 import java.nio.ByteBuffer;
@@ -64,22 +64,22 @@ public final class AdaptDirectLighting {
             Identifier.parse("adaptclient:post/adapt_composite");
 
     private static final BindGroupLayout DENOISE_LAYOUT = BindGroupLayout.builder()
-            .withSampler("DirectSampler")
-            .withSampler("GB0Sampler")
-            .withSampler("GB1Sampler")
-            .withSampler("GB4Sampler")
-            .withSampler("HistorySampler")
+            .withUniform("DirectSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB0Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB1Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB4Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("HistorySampler", UniformType.COMBINED_IMAGE_SAMPLER)
             .withUniform("DenoiseConfig", UniformType.UNIFORM_BUFFER)
             .withUniform("AdaptLighting", UniformType.UNIFORM_BUFFER)
             .build();
 
     private static final BindGroupLayout COMPOSITE_LAYOUT = BindGroupLayout.builder()
-            .withSampler("SceneSampler")
-            .withSampler("DirectSampler")
-            .withSampler("GB0Sampler")
-            .withSampler("GB3Sampler")
-            .withSampler("MainColorSampler")
-            .withSampler("MainDepthSampler")
+            .withUniform("SceneSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("DirectSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB0Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("GB3Sampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("MainColorSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+            .withUniform("MainDepthSampler", UniformType.COMBINED_IMAGE_SAMPLER)
             .withUniform("AdaptLighting", UniformType.UNIFORM_BUFFER)
             .build();
 
@@ -90,7 +90,7 @@ public final class AdaptDirectLighting {
             .withBindGroupLayout(DENOISE_LAYOUT)
             .withColorTargetState(new ColorTargetState(Optional.empty(),
                     GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL))
-            .withPrimitiveTopology(com.mojang.blaze3d.PrimitiveTopology.TRIANGLES)
+            .withPrimitiveTopology(com.mojang.renderpearl.api.pipeline.PrimitiveTopology.TRIANGLES)
             .build();
 
     private static final RenderPipeline COMPOSITE_PIPELINE = RenderPipeline.builder()
@@ -100,7 +100,7 @@ public final class AdaptDirectLighting {
             .withBindGroupLayout(COMPOSITE_LAYOUT)
             .withColorTargetState(new ColorTargetState(Optional.empty(),
                     GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL))
-            .withPrimitiveTopology(com.mojang.blaze3d.PrimitiveTopology.TRIANGLES)
+            .withPrimitiveTopology(com.mojang.renderpearl.api.pipeline.PrimitiveTopology.TRIANGLES)
             .build();
 
     /** 统一 HDR 场景色（太阳 + 环境 + albedo），未 tonemap。 */
@@ -165,17 +165,17 @@ public final class AdaptDirectLighting {
                                       GpuTextureView source, GpuTextureView target,
                                       GpuTextureView historySource,
                                       GpuBuffer config,
-                                      com.mojang.blaze3d.textures.GpuSampler sampler) {
+                                      com.mojang.renderpearl.api.textures.GpuSampler sampler) {
         try (RenderPass pass = encoder.createRenderPass(() -> label, target,
                 Optional.empty(), null, OptionalDouble.empty())) {
-            pass.setPipeline(DENOISE_PIPELINE);
+            pass.setPipeline(RenderSystem.getCompiledPipeline(DENOISE_PIPELINE));
             pass.setUniform("DenoiseConfig", config);
             AdaptLightingUniform.bind(pass);
-            pass.bindTexture("DirectSampler", source, sampler);
-            pass.bindTexture("GB0Sampler", DeferredGBuffer.gb0View(), sampler);
-            pass.bindTexture("GB1Sampler", DeferredGBuffer.gb1View(), sampler);
-            pass.bindTexture("GB4Sampler", DeferredGBuffer.gb4View(), sampler);
-            pass.bindTexture("HistorySampler", historySource, sampler);
+            pass.setUniform("DirectSampler", source, sampler);
+            pass.setUniform("GB0Sampler", DeferredGBuffer.gb0View(), sampler);
+            pass.setUniform("GB1Sampler", DeferredGBuffer.gb1View(), sampler);
+            pass.setUniform("GB4Sampler", DeferredGBuffer.gb4View(), sampler);
+            pass.setUniform("HistorySampler", historySource, sampler);
             pass.draw(3, 1, 0, 0);
         }
     }
@@ -193,14 +193,14 @@ public final class AdaptDirectLighting {
         var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         try (RenderPass pass = encoder.createRenderPass(() -> "Adapt composite",
                 mainColorTarget, Optional.empty(), null, OptionalDouble.empty())) {
-            pass.setPipeline(COMPOSITE_PIPELINE);
+            pass.setPipeline(RenderSystem.getCompiledPipeline(COMPOSITE_PIPELINE));
             AdaptLightingUniform.bind(pass);
-            pass.bindTexture("SceneSampler", sceneHdrView, nearest);
-            pass.bindTexture("DirectSampler", directAView, nearest);
-            pass.bindTexture("GB0Sampler", DeferredGBuffer.gb0View(), nearest);
-            pass.bindTexture("GB3Sampler", DeferredGBuffer.gb3View(), nearest);
-            pass.bindTexture("MainColorSampler", mainColorSnapshot, nearest);
-            pass.bindTexture("MainDepthSampler", mainDepthSnapshot, nearest);
+            pass.setUniform("SceneSampler", sceneHdrView, nearest);
+            pass.setUniform("DirectSampler", directAView, nearest);
+            pass.setUniform("GB0Sampler", DeferredGBuffer.gb0View(), nearest);
+            pass.setUniform("GB3Sampler", DeferredGBuffer.gb3View(), nearest);
+            pass.setUniform("MainColorSampler", mainColorSnapshot, nearest);
+            pass.setUniform("MainDepthSampler", mainDepthSnapshot, nearest);
             pass.draw(3, 1, 0, 0);
         }
     }

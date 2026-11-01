@@ -15,6 +15,7 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SplashPotionItem;
 import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * AutoPot —— 自动投掷药水（移植自 Rise 6.9.5 AutoPot）。
@@ -173,7 +174,7 @@ public class AutoPot extends Module {
             // 26.2 gameMode.useItem：内部 startPrediction 发 ServerboundUseItemPacket
             // （携带玩家当前旋转）+ ItemStack.use → ThrowablePotionItem.use 投掷
             mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         }
 
         mc.player.setYRot(oldYaw);

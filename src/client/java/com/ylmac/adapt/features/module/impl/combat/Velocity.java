@@ -128,7 +128,7 @@ public class Velocity extends Module {
 
     /** 是否当前处于挥动窗口（Rise On Swing） */
     private boolean inSwingWindow() {
-        return mc.player != null && mc.player.swinging;
+        return mc.player != null && mc.player.isSwinging();
     }
 
     @EventHandler

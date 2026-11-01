@@ -6,7 +6,7 @@ import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import com.ylmac.adapt.config.DesktopSettings;
 import com.ylmac.adapt.features.music.PlayerController;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
 /**
  * 歌曲封面 → 莫奈种子（"封面" 取色来源）。
@@ -40,7 +40,7 @@ public final class CoverSeedSampler {
     /** 一次性挂监听；之后每次 coverBytes 变化都会评估（来源/开关在触发时再判）。 */
     public synchronized void attachIfNeeded() {
         if (attached) return;
-        PlayerController pc = QplayerScreen.getPlayerController();
+        PlayerController pc = AdaptScreen.getPlayerController();
         if (pc == null || pc.coverBytes == null) return;
         attached = true;
         try {
@@ -59,7 +59,7 @@ public final class CoverSeedSampler {
     private void onCoverSet(byte[] bytes) {
         try {
             if (bytes == null || bytes.length == 0) return;
-            DesktopSettings settings = QplayerScreen.getDesktopSettings();
+            DesktopSettings settings = AdaptScreen.getDesktopSettings();
             if (settings == null) return;
             boolean enabled = Boolean.TRUE.equals(settings.monetEnabled.peek());
             int source = settings.monetSource == null
@@ -79,7 +79,7 @@ public final class CoverSeedSampler {
                 try {
                     BufferedImage img = ImageIO.read(new ByteArrayInputStream(bytes));
                     if (img == null) {
-                        QplayerModClient.LOGGER.warn("[QPlayer] Cover undecodable (webp?) — skip seed");
+                        AdaptClient.LOGGER.warn("[QPlayer] Cover undecodable (webp?) — skip seed");
                         return;
                     }
                     int w = img.getWidth(), h = img.getHeight();
@@ -93,12 +93,12 @@ public final class CoverSeedSampler {
                         }
                     }
                     double[] hct = MonetQuantizer.extractSeedColorHct(argb, 1.0);
-                    QplayerModClient.LOGGER.info("[QPlayer] Cover seed H={} C={} T={} ({}x{} → {})",
+                    AdaptClient.LOGGER.info("[QPlayer] Cover seed H={} C={} T={} ({}x{} → {})",
                         String.format("%.1f", hct[0]), String.format("%.1f", hct[1]),
                         String.format("%.1f", hct[2]), w, h, argb.length);
                     WorldColorSampler.get().submitSeed(hct[0], hct[1], hct[2]);
                 } catch (Throwable ex) {
-                    QplayerModClient.LOGGER.warn("[QPlayer] Cover seed failed: {} ({})",
+                    AdaptClient.LOGGER.warn("[QPlayer] Cover seed failed: {} ({})",
                         ex.getClass().getSimpleName(), ex.getMessage());
                 }
             }, "qplayer-cover-quantize");

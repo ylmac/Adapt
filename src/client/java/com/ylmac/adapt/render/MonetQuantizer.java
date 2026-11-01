@@ -1,13 +1,13 @@
 package com.ylmac.adapt.render;
 
-import io.github.timer_err.qml4j.runtime.color.Hct;
+import com.ylmac.adapt.theme.color.Hct;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import io.github.timer_err.qml4j.runtime.color.StyleManager;
+import com.ylmac.adapt.theme.StyleManager;
 
 /**
  * Pure-Java port of the PixelPlayer (album-art) seed-color extraction pipeline,
@@ -18,7 +18,7 @@ import io.github.timer_err.qml4j.runtime.color.StyleManager;
  *   fidelity, excess-chroma penalty)  →  local refinement → seed ARGB.
  *
  * The Android material-color-utilities Hct/Cam16 are replaced by the qml4j
- * runtime implementation (io.github.timer_err.qml4j.runtime.color.Hct), which
+ * runtime implementation (com.ylmac.adapt.theme.color.Hct), which
  * is plain double math on the same CAM16 viewing conditions — safe to run on
  * any thread, no engine instance needed.
  */

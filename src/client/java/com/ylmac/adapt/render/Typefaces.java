@@ -20,22 +20,32 @@ public final class Typefaces {
 
     private Typefaces() {}
 
-    /** 从 assets/adaptclient/qml/fonts/ 加载 TTF 字节 */
+    /** qml → qml-retired：字体随 QML 退役迁路径，旧路径保留兜底 */
+    private static final String[] FONT_DIRS = {
+            "/assets/adaptclient/qml-retired/fonts/",
+            "/assets/adaptclient/qml/fonts/",
+            "/assets/adaptclient/fonts/",
+    };
+
+    /** 从 assets 加载 TTF/OTF 字节 */
     private static byte[] load(String name) {
         byte[] cached = FILES.get(name);
         if (cached != null) return cached;
-        try (InputStream in = Typefaces.class.getResourceAsStream("/assets/adaptclient/qml/fonts/" + name)) {
-            if (in == null) return null;
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] b = new byte[8192];
-            int n;
-            while ((n = in.read(b)) != -1) out.write(b, 0, n);
-            byte[] data = out.toByteArray();
-            FILES.put(name, data);
-            return data;
-        } catch (Exception e) {
-            return null;
+        for (String dir : FONT_DIRS) {
+            try (InputStream in = Typefaces.class.getResourceAsStream(dir + name)) {
+                if (in == null) continue;
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                byte[] b = new byte[8192];
+                int n;
+                while ((n = in.read(b)) != -1) out.write(b, 0, n);
+                byte[] data = out.toByteArray();
+                if (data.length == 0) continue;
+                FILES.put(name, data);
+                return data;
+            } catch (Exception ignored) {
+            }
         }
+        return null;
     }
 
     /** AWT Font：Font.createFont + deriveFont(size)（Rise FontUtil.p 同款） */

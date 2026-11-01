@@ -9,11 +9,6 @@ import io.github.humbleui.skija.Paint;
 import io.github.humbleui.skija.Shader;
 import io.github.humbleui.types.Rect;
 
-import io.github.timer_err.qml4j.engine.binding.Property;
-import io.github.timer_err.qml4j.render.QmlView;
-import io.github.timer_err.qml4j.render.Renderer;
-import io.github.timer_err.qml4j.render.items.core.Item;
-
 import com.ylmac.adapt.render.FrameProfiler;
 import com.ylmac.adapt.features.music.PlayerController;
 import com.ylmac.adapt.features.music.lyric.LyricLine;
@@ -38,10 +33,6 @@ public final class LyricCompositor {
 
     private List<LyricLine> lastLyrics;
     private float lyricSlide;
-    private long renderedVersion = -1;
-    private boolean skippedLayout;
-
-    private Item lyricChrome;
 
     private long lyRawLast = -1;
     private boolean lyPlayingLast;
@@ -80,10 +71,6 @@ public final class LyricCompositor {
         return lyricRenderer;
     }
 
-    public boolean skippedLayout() {
-        return skippedLayout;
-    }
-
     public float lyricSlide() {
         return lyricSlide;
     }
@@ -104,46 +91,6 @@ public final class LyricCompositor {
         float topY = lyricTopY(topInset);
         float bottomY = surfaceHeightLogical - L_TRANSPORT_H;
         return y >= topY && y <= bottomY;
-    }
-
-    public void composite(Canvas canvas, Renderer renderer, QmlView view,
-                          PlayerController controller, SettingsBridge settings,
-                          DirectContext ctx, float uiScale, int fbW, int fbH) {
-        float lw = fbW / uiScale, lh = fbH / uiScale;
-        if (lyricChrome == null) lyricChrome = view.findByObjectName("lyricChrome");
-
-        // QML 下拉手势写 player.lyricSlide（JS double）后，Property 原始值是 Double，
-        // 不能用泛型 Float 的 peek()（每帧 Double→Float 转型崩溃 → 整个 GUI 空白）。
-        // peekDouble() 对任意 Number 安全。
-        double slidePrev = controller != null ? controller.lyricSlide.peekDouble() : 0.0;
-        boolean fullyCovered = slidePrev >= 0.999;
-        if (!fullyCovered) {
-            int sc = canvas.save();
-            canvas.scale(uiScale, uiScale);
-            boolean skipLayout = Property.changeVersion() == renderedVersion;
-            skippedLayout = skipLayout;
-            FrameProfiler.begin(FrameProfiler.QML_RENDER);
-            renderer.render(canvas, view.root(), skipLayout);
-            FrameProfiler.end(FrameProfiler.QML_RENDER);
-            renderedVersion = Property.changeVersion();
-            canvas.restoreToCount(sc);
-        } else if (Property.changeVersion() != renderedVersion) {
-            renderer.layoutOnly(lyricChrome != null ? lyricChrome : view.root());
-            renderedVersion = Property.changeVersion();
-            skippedLayout = false;
-        } else {
-            skippedLayout = true;
-        }
-        FrameProfiler.begin(FrameProfiler.DAWN_LYRIC);
-        drawLyricOverlay(canvas, controller, settings, ctx, uiScale, fbW, fbH);
-        FrameProfiler.end(FrameProfiler.DAWN_LYRIC);
-        double slideNow = controller != null ? controller.lyricSlide.peekDouble() : 0.0;
-        if (slideNow > 0.001 && lyricChrome != null) {
-            int scC = canvas.save();
-            canvas.scale(uiScale, uiScale);
-            renderer.renderSubtree(canvas, lyricChrome, lw, lh);
-            canvas.restoreToCount(scC);
-        }
     }
 
     private void drawLyricOverlay(Canvas canvas, PlayerController controller,
@@ -213,9 +160,14 @@ public final class LyricCompositor {
         }
         boolean bgStatic = settings != null && settings.lyricBgStatic();
         FrameProfiler.begin(FrameProfiler.FLUID_BG);
-        fluidBg.render(canvas, ctx, uiScale, w, h, cover, lyCoverKey,
-                System.nanoTime(), bgStatic);
-        FrameProfiler.end(FrameProfiler.FLUID_BG);
+        com.ylmac.adapt.render.Probe.begin("lyric.fluid");
+        try {
+            fluidBg.render(canvas, ctx, uiScale, w, h, cover, lyCoverKey,
+                    System.nanoTime(), bgStatic);
+        } finally {
+            com.ylmac.adapt.render.Probe.end("lyric.fluid");
+            FrameProfiler.end(FrameProfiler.FLUID_BG);
+        }
 
         float zoomTarget = coverOnly ? 0f : 1f;
         long zoomNow = System.nanoTime();
@@ -353,11 +305,6 @@ public final class LyricCompositor {
                 0f, topY, 0f, topY + colH,
                 new int[]{0x00FFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00FFFFFF},
                 new float[]{0f, f, 1f - f, 1f});
-    }
-
-    public void onSceneReloaded() {
-        lyricChrome = null;
-        renderedVersion = -1;
     }
 
     public void renderOverlay(Canvas canvas, PlayerController controller,

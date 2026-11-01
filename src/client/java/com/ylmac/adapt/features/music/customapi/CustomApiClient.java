@@ -3,7 +3,7 @@ package com.ylmac.adapt.features.music.customapi;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -62,7 +62,7 @@ public final class CustomApiClient {
             }
             return out;
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("custom-api search parse failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("custom-api search parse failed: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
@@ -79,7 +79,7 @@ public final class CustomApiClient {
             String resolved = JsonPath.resolveString(root, cfg.urlResultPath);
             return (resolved != null && !resolved.isEmpty()) ? resolved : null;
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("custom-api url parse failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("custom-api url parse failed: {}", e.getMessage());
             return null;
         }
     }
@@ -98,7 +98,7 @@ public final class CustomApiClient {
             String lrc = JsonPath.resolveString(root, cfg.lyricResultPath);
             return (lrc != null && !lrc.isEmpty()) ? lrc : null;
         } catch (Exception e) {
-            QplayerModClient.LOGGER.warn("custom-api lyric parse failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("custom-api lyric parse failed: {}", e.getMessage());
             return null;
         }
     }
@@ -149,7 +149,7 @@ public final class CustomApiClient {
             String text = readAll(is);
             return (code >= 400) ? null : text;
         } catch (IOException e) {
-            QplayerModClient.LOGGER.warn("custom-api request failed: {}", e.getMessage());
+            AdaptClient.LOGGER.warn("custom-api request failed: {}", e.getMessage());
             return null;
         } finally {
             if (conn != null) conn.disconnect();

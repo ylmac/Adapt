@@ -25,7 +25,7 @@ public class CommandManager {
         this.commands = new ArrayList<>();
     }
 
-    /** 全局单例（QplayerModClient.onInitializeClient 首次调用） */
+    /** 全局单例（AdaptClient.onInitializeClient 首次调用） */
     public static CommandManager get() {
         if (INSTANCE == null) {
             synchronized (CommandManager.class) {
@@ -56,6 +56,7 @@ public class CommandManager {
         commands.add(new PlayerCommand());
         commands.add(new DenickCommand());
         commands.add(new ClickGuiCommand());
+        commands.add(new ComposeCommand());
         commands.add(new ModuleCommand());
         commands.add(new InfoCommand());
         commands.add(new SetCommand());

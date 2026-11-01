@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * LegitScaffold 合法搭路（移植 Rise 6.9.5 ghost/LegitScaffold，适配 Fabric 26.2）。
@@ -249,7 +250,7 @@ public class LegitScaffold extends Module {
         BlockHitResult hit = new BlockHitResult(hitLocation, clickedSide, face, false);
         InteractionResult result = gm.useItemOn(player, InteractionHand.MAIN_HAND, hit);
         if (result.consumesAction()) {
-            player.swing(InteractionHand.MAIN_HAND);
+            player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         }
     }
 

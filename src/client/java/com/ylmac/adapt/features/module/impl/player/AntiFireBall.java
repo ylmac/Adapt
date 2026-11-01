@@ -9,6 +9,7 @@ import com.ylmac.adapt.features.module.settings.impl.DoubleSetting;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.hurtingprojectile.Fireball;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * AntiFireBall 防火焰弹（移植自 Rise 6.9.5 的 AntiFireBall 模块）。
@@ -115,7 +116,7 @@ public class AntiFireBall extends Module {
             // 4) 近身则攻击击落（Rise: C02PacketUseEntity ATTACK + 记录 UUID）
             if (attack.getValue() && attackCooldown == 0 && distSq <= attackRangeSq) {
                 mc.gameMode.attack(mc.player, fireball);
-                mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+                mc.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
                 attackCooldown = 5;
             }
 

@@ -1,5 +1,6 @@
 package com.ylmac.adapt.injection.mixins;
 
+import com.mojang.renderpearl.api.commands.RenderPass;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.feature.FeatureFrameContext;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
@@ -32,7 +33,7 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 public interface PreparedFrameAccessor {
 
     @Invoker("executePhase")
-    void adapt$executePhase(FeatureRenderPhase<?> phase, FeatureFrameContext context);
+    void adapt$executePhase(FeatureRenderPhase<?> phase, FeatureFrameContext context, RenderPass pass);
 
     @Accessor("context")
     FeatureFrameContext adapt$context();

@@ -22,6 +22,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * ThrowableAura —— 自动投掷鸡蛋/雪球（移植自 Rise 6.9.5 ThrowableAura）。
@@ -189,7 +190,7 @@ public class ThrowableAura extends Module {
         rotateTo(entity);
         ItemStack held = mc.player.getMainHandItem();
         if (held != null && !held.isEmpty()) {
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
             mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
         }
         mc.player.setYRot(oldYaw);

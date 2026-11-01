@@ -172,7 +172,7 @@ public class BedPlates extends Module implements net.fabricmc.fabric.api.client.
     private void rescan() {
         beds.clear();
         bedBlocks.clear();
-        BlockPos.withinManhattan(mc.player.blockPosition(), 48, 48, 48).forEach(pos -> {
+        BlockPos.withinClippedManhattan(mc.player.blockPosition(), 48, 48, 48).forEach(pos -> {
             BlockState state = mc.level.getBlockState(pos);
             if (state.getBlock() instanceof BedBlock
                     && BedBlock.getBlockType(state) == DoubleBlockCombiner.BlockType.FIRST) {

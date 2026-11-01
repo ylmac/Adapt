@@ -4,7 +4,7 @@ import com.ylmac.adapt.config.DesktopSettings;
 import com.ylmac.adapt.features.module.Category;
 import com.ylmac.adapt.features.module.Module;
 import com.ylmac.adapt.features.module.settings.impl.BoolSetting;
-import com.ylmac.adapt.render.QplayerScreen;
+import com.ylmac.adapt.render.AdaptScreen;
 
 /**
  * 外观（Appearance）—— 客户端界面外观总开关，设置分类下的入口模块。
@@ -30,7 +30,7 @@ public class AppearanceModule extends Module {
 
     private static void write(DsWriter w) {
         try {
-            DesktopSettings ds = QplayerScreen.getDesktopSettings();
+            DesktopSettings ds = AdaptScreen.getDesktopSettings();
             if (ds != null) w.write(ds);
         } catch (Throwable ignored) {
         }
@@ -50,7 +50,7 @@ public class AppearanceModule extends Module {
     /** 从 DesktopSettings 读回当前值（QML 设置页改过的话保持一致）。 */
     public void pullFromSettings() {
         try {
-            DesktopSettings ds = QplayerScreen.getDesktopSettings();
+            DesktopSettings ds = AdaptScreen.getDesktopSettings();
             if (ds == null) return;
             guiFluidBg.setValueSilently(Boolean.TRUE.equals(ds.guiFluidBg.peek()));
             glassShadow.setValueSilently(Boolean.TRUE.equals(ds.glassShadow.peek()));
@@ -62,7 +62,7 @@ public class AppearanceModule extends Module {
     /** 把模块里的值写入 DesktopSettings（QML 侧读的是同一份）。 */
     public void pushToSettings() {
         try {
-            DesktopSettings ds = QplayerScreen.getDesktopSettings();
+            DesktopSettings ds = AdaptScreen.getDesktopSettings();
             if (ds == null) return;
             ds.guiFluidBg.set(Boolean.TRUE.equals(guiFluidBg.getValue()));
             ds.glassShadow.set(Boolean.TRUE.equals(glassShadow.getValue()));

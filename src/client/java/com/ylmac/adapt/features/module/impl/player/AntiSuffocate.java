@@ -11,6 +11,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * AntiSuffocate 防窒息（移植自 Rise 6.9.5 的 AntiSuffocate 模块）。
@@ -80,7 +81,7 @@ public class AntiSuffocate extends Module {
                     new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, below, Direction.UP));
         }
         if (swing.getValue()) {
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         }
         if (pushOut.getValue()) {
             // 向上移出窒息方块，并清除垂直速度防回弹

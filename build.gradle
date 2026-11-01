@@ -2,6 +2,8 @@ plugins {
     id 'net.fabricmc.fabric-loom' version "1.17.14"
     id 'maven-publish'
     id 'java'
+    id 'org.jetbrains.kotlin.jvm' version "${kotlin_version}"
+    id 'org.jetbrains.kotlin.plugin.compose' version "${kotlin_version}"
 }
 
 version = project.mod_version
@@ -13,7 +15,43 @@ repositories {
     maven { url "https://maven.aliyun.com/repository/central" }
     maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
     mavenCentral()
+    google()
+    maven { url "https://dl.google.com/dl/android/maven2/" }
     maven { url "https://maven.fabricmc.net/" }
+    maven { url "https://repo.polyfrost.org/releases" }
+    maven { url "https://maven.pkg.jetbrains.space/public/p/compose/dev" }
+}
+
+// Compose 编译 classpath：从已解析的 compose-bundle 解出嵌套 jar（与运行时同源），
+// 避免再拉一套 JetBrains/AndroidX 坐标踩不到 alpha 构件。
+configurations {
+    composeBundleResolve {
+        transitive = false
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+dependencies {
+    composeBundleResolve("org.polyfrost.oneconfig:compose-bundle:${project.compose_bundle_version}")
+}
+
+def composeCompileLibs = layout.buildDirectory.dir("compose-compile-libs")
+
+tasks.register("extractComposeCompileLibs", Copy) {
+    from({
+        def bundle = configurations.composeBundleResolve.files.find {
+            it.name.startsWith("compose-bundle")
+        } ?: configurations.composeBundleResolve.singleFile
+        zipTree(bundle).matching {
+            include "META-INF/jars/*.jar"
+        }
+    })
+    into(composeCompileLibs)
+    includeEmptyDirs = false
+    eachFile { fcd ->
+        fcd.path = fcd.name // flatten META-INF/jars/foo.jar → foo.jar
+    }
 }
 
 dependencies {
@@ -24,23 +62,21 @@ dependencies {
     // the game instance provides the actual mod at runtime.
     compileOnly files('libs/sodium-fabric-0.9.1-beta.2+mc26.2.jar')
 
-    // qml4j：直接解包进 mod JAR 根目录（不作为嵌套 JAR）。
-    // 我们的源文件（Item/Renderer/Image/Text/StyleManager/RestoreHelper）也在根目录，
-    // duplicatesStrategy=EXCLUDE 时源集先编译 → 覆盖 qml4j 同名 class。
-    implementation("io.github.timer-err:qml4j-core:0.2.16-patched") {
-        exclude group: 'io.github.humbleui'
-    }
-    include implementation("org.antlr:antlr4-runtime:4.13.2")
+    // Kotlin + Compose runtime (JiJ so players need not install them separately).
+    // This project historically uses include(implementation(...)) — Loom here has no
+    // modImplementation helper in the Groovy DSL evaluation path we hit.
+    include implementation("net.fabricmc:fabric-language-kotlin:${project.fabric_language_kotlin_version}")
+    include implementation("org.polyfrost.oneconfig:compose-bundle:${project.compose_bundle_version}")
+
     implementation("org.ow2.asm:asm:9.7")
-    implementation("org.ow2.asm:asm-util:9.7")
-    include implementation("org.mozilla:rhino:1.9.1")
     include implementation("io.github.humbleui:types:0.2.0")
     include implementation("io.github.humbleui:skija-shared:${project.skija_version}")
     // 多平台 skija native：macOS arm64（本机）+ Windows x64（用户要求支持 Windows）
     include implementation("io.github.humbleui:skija-macos-arm64:${project.skija_version}")
     include implementation("io.github.humbleui:skija-windows-x64:${project.skija_version}")
 
-    include implementation("com.google.code.gson:gson:2.10.1")
+    // 游戏自己带 gson，只用来编译，不再塞进模组包。
+    implementation("com.google.code.gson:gson:2.10.1")
     include implementation("net.jthink:jaudiotagger:3.0.1")
     include implementation("com.googlecode.soundlibs:jlayer:1.0.1.4")
     include implementation("org.jflac:jflac-codec:1.5.2")
@@ -60,10 +96,45 @@ loom {
     }
 }
 
+// Compose APIs only needed to compile client Kotlin UI (runtime = compose-bundle JiJ).
+def composeJarTree = fileTree(composeCompileLibs) {
+    include "*.jar"
+    builtBy tasks.named("extractComposeCompileLibs")
+}
+afterEvaluate {
+    sourceSets.client.compileClasspath += composeJarTree
+    sourceSets.client.runtimeClasspath += composeJarTree
+    tasks.named("compileClientKotlin", org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configure { t ->
+        t.dependsOn(tasks.named("extractComposeCompileLibs"))
+        // Directory Provider 不会自动把子 jar 加进 classpath；用 fileTree。
+        t.libraries.from(composeJarTree)
+        // 兼容部分 KGP：同步进任务 classpath（若属性存在）
+        try {
+            t.classpath += composeJarTree
+        } catch (Throwable ignored) {
+        }
+    }
+    tasks.named("compileClientJava").configure {
+        dependsOn(tasks.named("extractComposeCompileLibs"))
+        classpath += composeJarTree
+    }
+}
+
 java {
     withSourcesJar()
     sourceCompatibility = JavaVersion.toVersion(project.java_version)
     targetCompatibility = JavaVersion.toVersion(project.java_version)
+}
+
+kotlin {
+    jvmToolchain(Integer.parseInt(project.java_version))
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(project.java_version))
+        freeCompilerArgs.addAll([
+                '-opt-in=androidx.compose.material.ExperimentalMaterialApi',
+                '-opt-in=androidx.compose.ui.ExperimentalComposeUiApi',
+        ])
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -81,59 +152,8 @@ processResources {
 }
 
 jar {
-    // 把 qml4j JAR 的所有 class 直接解包进 mod JAR 根目录（不再嵌套）。
-    // duplicatesStrategy=EXCLUDE：sourceSet 编译的类（含我们修改的 Item/Renderer
-    // /Image/Text/StyleManager/RestoreHelper）先加入，qml4j JAR 的同名 class
-    // 自动跳过 → 我们的版本生效。
-    from {
-        zipTree(configurations.runtimeClasspath.filter { it.name.startsWith('qml4j-core') }.singleFile)
-    } {
-        exclude 'META-INF/**'
-    }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from("LICENSE") {
         rename { "${it}_${project.archives_base_name}" }
-    }
-}
-
-// ── 构建期 QML 缓存预编译（自动随 build 运行） ────────────────────
-// 编译 QML 源文件 → 字节码缓存到独立目录 build/qml-cache-build →
-// jar 从那里复制进 JAR 的 assets/adaptclient/qml-cache/。
-// 运行时 QmlCacheManager 从 JAR classpath 读取此缓存到内存，
-// 使 QML 加载零磁盘 I/O。
-def qmlCacheDir = file("build/qml-cache-build")
-def qmlSrcDir = file("src/main/resources/assets/adaptclient/qml")
-def qmlAssetsDir = file("src/main/resources/assets")
-
-tasks.register("buildQmlCache", JavaExec) {
-    // 全量重建：旧目录里的缓存与新源码哈希混在一起会让 qml4j 的全局类计数错位
-    // （陈旧子缓存 restoreAll 后新 Main 编译导致 NoClassDefFoundError、根缓存漏写，
-    // 启动时首开仍然回退到 1s 编译）。每次构建前清空输出目录，保证单次编译内自洽。
-    doFirst { delete qmlCacheDir }
-    // 不 dependsOn compileClientJava：Gradle 任务图保证 classes → compileClientJava
-    // 在 jar 之前执行，而 jar dependsOn buildQmlCache，所以 buildQmlCache 运行时
-    // client 类已编译（runtimeClasspath 惰性解析）。
-    jvmArgs += ["-Djava.awt.headless=true"]
-    classpath = sourceSets.client.runtimeClasspath
-    mainClass = "com.ylmac.adapt.ui.QmlCacheBuilder"
-    args = [
-        // QML 源：直接用 src 目录，不依赖 processResources 产物
-        qmlSrcDir.absolutePath,
-        qmlCacheDir.absolutePath,
-        qmlAssetsDir.absolutePath
-    ]
-    ignoreExitValue = true
-    doLast {
-        def cacheFiles = fileTree(qmlCacheDir).matching { include "*.cache" }.files
-        def manifest = new File(qmlCacheDir, "prebuilt-manifest.txt")
-        manifest.text = cacheFiles.collect { it.name }.join("\n")
-        logger.lifecycle("QML cache built: {} files -> {}", cacheFiles.size(), qmlCacheDir)
-    }
-}
-
-tasks.named("jar") {
-    dependsOn tasks.named("buildQmlCache")
-    from(qmlCacheDir) {
-        into "assets/adaptclient/qml-cache"
     }
 }

@@ -1,11 +1,13 @@
 package com.ylmac.adapt.render;
 
-import com.mojang.blaze3d.GpuFormat;
+import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuSampler;
+import com.mojang.renderpearl.api.textures.AddressMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
@@ -108,7 +110,7 @@ public final class AdaptShadowMap {
      * 复用同一套 caster 基础设施（sodium_shadow 管线），只换投影矩阵为顶视正交。
      */
     private static TextureTarget skyTarget;
-    private static com.mojang.blaze3d.buffers.GpuBuffer frameBuffer;
+    private static com.mojang.renderpearl.api.buffers.GpuBuffer frameBuffer;
     private static GpuSampler sampler;
     private static boolean rendering;
 
@@ -295,8 +297,6 @@ public final class AdaptShadowMap {
             // 渲染 drawChunkLayer 能重新写入主矩阵（否则世界会用光矩阵渲染）。
             resetSodiumUniformGuard();
             rendering = false;
-            RenderSystem.outputColorTextureOverride = null;
-            RenderSystem.outputDepthTextureOverride = null;
         }
 
         // 天光可见度图：同一套 caster，投影换成顶视正交。这是 lightmap.y 的
@@ -312,8 +312,6 @@ public final class AdaptShadowMap {
             resetSodiumUniformGuard();
             renderingSky = false;
             rendering = false;
-            RenderSystem.outputColorTextureOverride = null;
-            RenderSystem.outputDepthTextureOverride = null;
         }
         AdaptRenderProfiler.end(AdaptRenderProfiler.SHADOW_TERRAIN);
     }
@@ -358,7 +356,7 @@ public final class AdaptShadowMap {
             Constructor<?> matricesCtor = matricesClass.getConstructor(org.joml.Matrix4fc.class, org.joml.Matrix4fc.class);
             Object matrices = matricesCtor.newInstance(skyProjection, skyModelView);
             Class<?> groupClass = net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup.class;
-            Class<?> samplerClass = com.mojang.blaze3d.textures.GpuSampler.class;
+            Class<?> samplerClass = com.mojang.renderpearl.api.textures.GpuSampler.class;
             Method draw = rendererClass.getMethod("drawChunkLayer", groupClass, matricesClass,
                     double.class, double.class, double.class, samplerClass);
             draw.invoke(renderer, net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup.OPAQUE,
@@ -399,13 +397,12 @@ public final class AdaptShadowMap {
      * 这正是 Beryl 的语义：同一批实体几何画两遍，一遍进 shadow map、一遍进主
      * target。blob shadow 已由 BlobShadowMixin 移除，方向影是实体唯一地面阴影。
      * <p>
-     * 两个 override 把每个 draw 自建的 pass 重定向到 shadow map：
-     * {@code PreparedRenderType.drawFromBuffer} 开头就是
-     * {@code outputColorTextureOverride != null ? 它 : outputTarget…}
-     * （字节码 off.9-26），深度同理（off.36-53），且 clear 传的是
-     * {@code Optional.empty()/OptionalDouble.empty()} → LOAD，不会擦掉地形那份。
-     * 管线由 AdaptRenderPassPipelineMixin 在 {@code setPipeline} 换成 caster
-     * 变体（依赖这里的 {@code rendering=true}），ShadowFrame 由
+     * 26.3：{@code PreparedFrame.executeSolid/Translucent} 改为接收外部
+     * {@link RenderPass}，不再自建 pass，{@code RenderSystem.output*TextureOverride}
+     * 已删除。这里直接开一张指向 shadow map 的 pass（颜色 LOAD / 深度 LOAD，
+     * 保留地形 caster 已写入的深度），把实体 solid + translucentModels 画进去。
+     * 管线由 AdaptRenderPassPipelineMixin（{@code getCompiledPipelineNullable}）
+     * 在 {@code rendering=true} 时换成 caster 变体；ShadowFrame 由
      * AdaptRenderSystemMixin 在 {@code bindDefaultUniforms} 换成 caster 版本。
      * <p>
      * caster 的颜色写掩码是 WRITE_NONE，所以一起画进来的方块实体（箱子/告示牌）
@@ -421,12 +418,17 @@ public final class AdaptShadowMap {
         AdaptRenderProfiler.begin(AdaptRenderProfiler.SHADOW_ENTITY);
         rendering = true;
         try {
-            RenderSystem.outputColorTextureOverride = target.getColorTextureView();
-            RenderSystem.outputDepthTextureOverride = target.getDepthTextureView();
-            java.lang.reflect.Method executeSolid = preparedFrame.getClass().getMethod("executeSolid");
-            executeSolid.invoke(preparedFrame);
-            // 玩家走 translucentModels phase，不在 solid 里 —— 必须单独执行。
-            renderTranslucentModelShadow(preparedFrame);
+            CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
+            try (RenderPass pass = encoder.createRenderPass(
+                    () -> "Adapt entity shadow",
+                    target.getColorTextureView(), Optional.empty(),
+                    target.getDepthTextureView(), OptionalDouble.empty())) {
+                java.lang.reflect.Method executeSolid = preparedFrame.getClass()
+                        .getMethod("executeSolid", RenderPass.class);
+                executeSolid.invoke(preparedFrame, pass);
+                // 玩家走 translucentModels phase，不在 solid 里 —— 必须单独执行。
+                renderTranslucentModelShadow(preparedFrame, pass);
+            }
         } catch (Throwable t) {
             long now = System.nanoTime();
             if (now - lastShadowFailLogNs > 3_000_000_000L) {
@@ -435,8 +437,6 @@ public final class AdaptShadowMap {
                         .error("entity shadow caster failed: {}", t.toString());
             }
         } finally {
-            RenderSystem.outputColorTextureOverride = null;
-            RenderSystem.outputDepthTextureOverride = null;
             rendering = false;
             AdaptRenderProfiler.end(AdaptRenderProfiler.SHADOW_ENTITY);
         }
@@ -464,7 +464,7 @@ public final class AdaptShadowMap {
      * alpha cutout（{@code color.a < 0.1} discard）处理，玩家皮肤的不透明
      * 区域本来就该投影。
      */
-    private static void renderTranslucentModelShadow(Object preparedFrame) {
+    private static void renderTranslucentModelShadow(Object preparedFrame, RenderPass pass) {
         if (!(preparedFrame instanceof com.ylmac.adapt.injection.mixins.PreparedFrameAccessor accessor)) {
             return;
         }
@@ -475,7 +475,7 @@ public final class AdaptShadowMap {
         }
         for (net.minecraft.client.renderer.SubmitNodeCollection collection
                 : storage.getSubmitsPerOrder().values()) {
-            accessor.adapt$executePhase(collection.translucentModels, context);
+            accessor.adapt$executePhase(collection.translucentModels, context, pass);
         }
     }
 
@@ -502,7 +502,7 @@ public final class AdaptShadowMap {
             Constructor<?> matricesCtor = matricesClass.getConstructor(org.joml.Matrix4fc.class, org.joml.Matrix4fc.class);
             Object matrices = matricesCtor.newInstance(lightProjection, modelView);
             Class<?> groupClass = net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup.class;
-            Class<?> samplerClass = com.mojang.blaze3d.textures.GpuSampler.class;
+            Class<?> samplerClass = com.mojang.renderpearl.api.textures.GpuSampler.class;
             Method draw = rendererClass.getMethod("drawChunkLayer", groupClass, matricesClass,
                     double.class, double.class, double.class, samplerClass);
             draw.invoke(renderer, net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup.OPAQUE,
@@ -520,18 +520,18 @@ public final class AdaptShadowMap {
         }
     }
 
-    public static void bindCasterUniforms(com.mojang.blaze3d.systems.RenderPass pass) {
+    public static void bindCasterUniforms(com.mojang.renderpearl.api.commands.RenderPass pass) {
         ensureResources();
         pass.setUniform("ShadowFrame", frameBuffer);
     }
 
     /** Bind shadow map + sky-occlusion map + frame UBO to a receiver pass. */
-    public static void bindReceiver(com.mojang.blaze3d.systems.RenderPass pass) {
+    public static void bindReceiver(com.mojang.renderpearl.api.commands.RenderPass pass) {
         ensureResources();
         pass.setUniform("ShadowFrame", frameBuffer);
-        pass.bindTexture("ShadowMapSampler", target.getDepthTextureView(), sampler);
+        pass.setUniform("ShadowMapSampler", target.getDepthTextureView(), sampler);
         // 天光可见度图：lightmap.y 的自建替代（adaptSkyVisibility）
-        pass.bindTexture("SkyOcclusionSampler", skyTarget.getDepthTextureView(), sampler);
+        pass.setUniform("SkyOcclusionSampler", skyTarget.getDepthTextureView(), sampler);
     }
 
     public static void close() {
@@ -579,16 +579,16 @@ public final class AdaptShadowMap {
     private static void ensureResources() {
         if (target == null) {
             target = new TextureTarget("adaptclient_directional_shadow", RESOLUTION, RESOLUTION,
-                    true, GpuFormat.RGBA8_UNORM);
+                    GpuFormat.RGBA8_UNORM, GpuFormat.D32_FLOAT);
         }
         if (skyTarget == null) {
             skyTarget = new TextureTarget("adaptclient_sky_occlusion", SKY_RESOLUTION, SKY_RESOLUTION,
-                    true, GpuFormat.RGBA8_UNORM);
+                    GpuFormat.RGBA8_UNORM, GpuFormat.D32_FLOAT);
         }
         if (frameBuffer == null) {
             frameBuffer = RenderSystem.getDevice().createBuffer(() -> "Adapt ShadowFrame UBO",
-                    com.mojang.blaze3d.buffers.GpuBuffer.USAGE_COPY_DST
-                            | com.mojang.blaze3d.buffers.GpuBuffer.USAGE_UNIFORM,
+                    com.mojang.renderpearl.api.buffers.GpuBuffer.USAGE_COPY_DST
+                            | com.mojang.renderpearl.api.buffers.GpuBuffer.USAGE_UNIFORM,
                     FRAME_SIZE);
             FRAME.clear();
             lightViewProjection.identity();

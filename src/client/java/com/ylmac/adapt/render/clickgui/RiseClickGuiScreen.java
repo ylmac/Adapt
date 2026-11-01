@@ -1,6 +1,6 @@
 package com.ylmac.adapt.render.clickgui;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.module.Category;
 import com.ylmac.adapt.features.module.Module;
 import com.ylmac.adapt.features.module.ModuleDescriptions;
@@ -308,7 +308,7 @@ public class RiseClickGuiScreen extends Screen {
                 dumpFrame();
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[RiseClickGUI] render failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[RiseClickGUI] render failed: {}", t.toString());
         }
     }
 
@@ -1750,12 +1750,12 @@ public class RiseClickGuiScreen extends Screen {
                 String name = String.format("rise-%02d.png", guiDumpCount);
                 java.nio.file.Files.write(path.resolve(name), data.getBytes());
                 data.close();
-                QplayerModClient.LOGGER.info("[RiseClickGUI] dumped {} ({}x{})",
+                AdaptClient.LOGGER.info("[RiseClickGUI] dumped {} ({}x{})",
                         path.resolve(name), img.getWidth(), img.getHeight());
                 guiDumpCount++;
             }
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[RiseClickGUI] dump failed: {}", t.toString());
+            AdaptClient.LOGGER.warn("[RiseClickGUI] dump failed: {}", t.toString());
         } finally {
             if (img != null) try { img.close(); } catch (Throwable ignored) { }
         }
@@ -1787,12 +1787,12 @@ public class RiseClickGuiScreen extends Screen {
                 java.nio.file.Path out = dir.resolve("page-" + page + ".png");
                 java.nio.file.Files.write(out, data.getBytes());
                 data.close();
-                QplayerModClient.LOGGER.info("[RiseClickGUI] dumped {}", out);
+                AdaptClient.LOGGER.info("[RiseClickGUI] dumped {}", out);
             }
             img.close();
             s.close();
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[RiseClickGUI] dump page {} failed: {}", page, t.toString());
+            AdaptClient.LOGGER.warn("[RiseClickGUI] dump page {} failed: {}", page, t.toString());
         }
     }
 

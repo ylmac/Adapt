@@ -3,7 +3,6 @@ package com.ylmac.adapt.render;
 import com.mojang.blaze3d.platform.NativeImage;
 import io.github.humbleui.skija.*;
 import io.github.humbleui.types.RRect;
-import io.github.timer_err.qml4j.render.SurfaceBackend;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
@@ -13,9 +12,9 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 
-public final class MinecraftSurfaceBackend implements SurfaceBackend {
+public final class MinecraftSurfaceBackend {
     private static final AtomicLong COUNTER = new AtomicLong();
 
     private static final int VK_FORMAT_R8G8B8A8_UNORM = 37;
@@ -49,6 +48,10 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
     private int saveCount = 0;
     private boolean useGpu = false;
     private boolean isGL = false;
+    /** acquireCanvas 清屏色（默认全透明）；QmlScreen 可设半透明底。 */
+    private int clearColor = 0x00000000;
+    /** scale 之后、把画布交给调用方之前的钩子（流体背景等，逻辑坐标）。 */
+    private java.util.function.Consumer<Canvas> afterAcquire;
 
     public MinecraftSurfaceBackend(String name, int logicalWidth, int logicalHeight, float guiScale) {
         this.name = name;
@@ -59,7 +62,6 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
         init((int)(logicalWidth * guiScale), (int)(logicalHeight * guiScale));
     }
 
-    @Override
     public void init(int displayWidth, int displayHeight) {
         disposeInternal();
         devWidth = displayWidth;
@@ -107,9 +109,9 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
             }
 
             useGpu = true;
-            QplayerModClient.LOGGER.info("[MinecraftSurfaceBackend] GPU {} active", isGL ? "OpenGL" : "Vulkan");
+            AdaptClient.LOGGER.info("[MinecraftSurfaceBackend] GPU {} active", isGL ? "OpenGL" : "Vulkan");
         } catch (Throwable e) {
-            QplayerModClient.LOGGER.warn("[MinecraftSurfaceBackend] GPU failed, fallback to CPU: {}", e.toString());
+            AdaptClient.LOGGER.warn("[MinecraftSurfaceBackend] GPU failed, fallback to CPU: {}", e.toString());
             cleanupGpu();
             initCpu(displayWidth, displayHeight);
         }
@@ -212,15 +214,27 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
         }
     }
 
-    @Override
+    public void setClearColor(int argb) { this.clearColor = argb; }
+
+    public void setAfterAcquire(java.util.function.Consumer<Canvas> hook) {
+        this.afterAcquire = hook;
+    }
+
     public Canvas acquireCanvas() {
         Surface surface = useGpu ? gpuSurface : cpuSurface;
         if (surface == null) return null;
         Canvas canvas = surface.getCanvas();
+        // 强制回到根矩阵，避免上一帧 save/restore 不对称留下残留 scale。
+        canvas.restoreToCount(1);
         saveCount = canvas.save();
-        // Clear to transparent so old frames don't leak through
-        canvas.clear(0x00000000);
+        canvas.clear(clearColor);
         canvas.scale(guiScale, guiScale);
+        if (afterAcquire != null) {
+            try { afterAcquire.accept(canvas); }
+            catch (Throwable t) {
+                AdaptClient.LOGGER.warn("[MinecraftSurfaceBackend] afterAcquire: {}", t.toString());
+            }
+        }
         return canvas;
     }
 
@@ -237,7 +251,6 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
         return surface.getCanvas();
     }
 
-    @Override
     public void present() {
         if (useGpu) {
             if (gpuSurface == null) return;
@@ -264,7 +277,6 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
             GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, nativeImage.getPointer());
     }
 
-    @Override
     public void resize(int logicalWidth, int logicalHeight) {
         this.width = logicalWidth;
         this.height = logicalHeight;
@@ -302,13 +314,12 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
         init(dw, dh);
     }
 
-    @Override
     public void dispose() {
         disposeInternal();
     }
 
-    @Override public int width() { return width; }
-    @Override public int height() { return height; }
+    public int width() { return width; }
+    public int height() { return height; }
     /**
      * 贴这个表面该用的 GUI 管线。
      * <p>
@@ -321,15 +332,16 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
      * <p>
      * CPU 回退路径的位图是 UNPREMUL（见 {@link #initCpu}），仍走 {@code GUI_TEXTURED}。
      */
-    public com.mojang.blaze3d.pipeline.RenderPipeline blitPipeline() {
+    public com.mojang.renderpearl.api.pipeline.RenderPipeline blitPipeline() {
         return useGpu
                 ? net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA
                 : net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED;
     }
 
     public Identifier getTextureId() { return textureId; }
-    public int getDisplayWidth() { return (int)(width * guiScale); }
-    public int getDisplayHeight() { return (int)(height * guiScale); }
+    /** 实际 GPU/CPU 纹理宽（ensureDeviceScale 用 Math.round，勿再 width*guiScale 截断）。 */
+    public int getDisplayWidth() { return Math.max(1, devWidth); }
+    public int getDisplayHeight() { return Math.max(1, devHeight); }
     public float getGuiScale() { return guiScale; }
     public boolean isGpuActive() { return useGpu; }
 
@@ -350,7 +362,6 @@ public final class MinecraftSurfaceBackend implements SurfaceBackend {
         canvas.clipRRect(bounds, ClipMode.INTERSECT, true);
     }
 
-    @Override
     public DirectContext recordingContext() {
         if (useGpu && gpuContext != null) {
             return gpuContext;

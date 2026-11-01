@@ -18,6 +18,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.world.item.component.SwingAnimation;
 
 /**
  * AimBacktrack 瞄准回溯（移植自 Rise 6.9.5 AimBacktrack，保留"blatant"注释）。
@@ -109,7 +110,7 @@ public class AimBacktrack extends Module {
         if (backtrackTarget != null) {
             // 直接对旧位目标发起攻击（等价 Rise attackEntity）
             mc.gameMode.attack(mc.player, backtrackTarget);
-            mc.player.swing(InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         }
     }
 

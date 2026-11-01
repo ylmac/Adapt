@@ -8,7 +8,8 @@ import com.ylmac.adapt.features.event.impl.PlayerTickEvent;
 import com.ylmac.adapt.features.module.Category;
 import com.ylmac.adapt.features.module.Module;
 import com.ylmac.adapt.util.ChatUtil;
-import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
+import net.minecraft.network.protocol.game.ClientboundSwingAnimationPacket;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -198,11 +199,11 @@ public class Mimic extends Module {
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
         if (!clicker.getValue() || mc.player == null || mc.level == null) return;
-        if (!(event.getPacket() instanceof ClientboundAnimatePacket packet)) return;
-        if (packet.getAction() != ClientboundAnimatePacket.SWING_MAIN_HAND) return;
+        if (!(event.getPacket() instanceof ClientboundSwingAnimationPacket packet)) return;
+        if (packet.hand() != InteractionHand.MAIN_HAND) return;
 
         // 找发出动画的实体（Rise：entityID → 玩家名）
-        Entity entity = mc.level.getEntity(packet.getId());
+        Entity entity = mc.level.getEntity(packet.entityId());
         if (entity == null || entity == mc.player) return;
         if (!(entity instanceof LivingEntity living)) return;
         String name = living.getName().getString();

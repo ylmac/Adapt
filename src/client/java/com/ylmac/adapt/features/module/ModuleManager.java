@@ -1,6 +1,6 @@
 package com.ylmac.adapt.features.module;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.event.bus.EventBus;
 import com.ylmac.adapt.features.event.bus.EventHandler;
 import com.ylmac.adapt.features.event.impl.KeyPressEvent;
@@ -50,7 +50,7 @@ public class ModuleManager {
         modules.add(module);
         // 注册进 ModuleRegistry（ClickGUI/HUD 的视图层），否则 UI 找不到模块
         syncHud(module);
-        QplayerModClient.LOGGER.info("[ModuleManager] 注册模块: {} ({})", module.getName(), module.getCategory().getId());
+        AdaptClient.LOGGER.info("[ModuleManager] 注册模块: {} ({})", module.getName(), module.getCategory().getId());
     }
 
     public synchronized Module find(String moduleId) {
@@ -109,6 +109,12 @@ public class ModuleManager {
         return null;
     }
 
+    private static boolean ourScreen(Screen screen) {
+        return screen instanceof com.ylmac.adapt.compose.host.AdaptComposeScreen
+                || screen instanceof com.ylmac.adapt.render.clickgui.RiseClickGuiScreen
+                || screen instanceof com.ylmac.adapt.render.clickgui.ListClickGuiScreen;
+    }
+
     @EventHandler
     private void onKeyPress(KeyPressEvent event) {
         Minecraft mc = Minecraft.getInstance();
@@ -117,7 +123,7 @@ public class ModuleManager {
         // 绑定"音乐播放器"的键在界面打开时按下应能再次关闭（之前被 screen != null 挡住，
         // 导致只能按 ESC 关闭）。第三方界面（聊天/容器等）仍不响应。
         Screen screen = mc.gui.screen();
-        if (screen != null && !(screen instanceof com.ylmac.adapt.render.QmlScreen)) return;
+        if (screen != null && !ourScreen(screen)) return;
         dispatchKeyBind(event.getKey(), event.getAction());
     }
 
@@ -126,7 +132,7 @@ public class ModuleManager {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
         Screen screen = mc.gui.screen();
-        if (screen != null && !(screen instanceof com.ylmac.adapt.render.QmlScreen)) return;
+        if (screen != null && !ourScreen(screen)) return;
         dispatchKeyBind(KeybindUtils.encodeMouseButton(event.getButton()), event.getAction());
     }
 
@@ -160,7 +166,7 @@ public class ModuleManager {
         }
 
         if (!affectedModules.isEmpty()) {
-            QplayerModClient.LOGGER.info("[ModuleManager] 按键 {} 触发 {} 个模块", keyCode, affectedModules.size());
+            AdaptClient.LOGGER.info("[ModuleManager] 按键 {} 触发 {} 个模块", keyCode, affectedModules.size());
         }
     }
 

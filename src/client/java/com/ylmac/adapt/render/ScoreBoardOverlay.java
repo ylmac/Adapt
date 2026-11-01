@@ -1,6 +1,6 @@
 package com.ylmac.adapt.render;
 
-import com.ylmac.adapt.QplayerModClient;
+import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.features.module.ModuleRegistry;
 import com.ylmac.adapt.features.module.impl.render.ScoreBoardModule;
 import io.github.humbleui.skija.Canvas;
@@ -214,6 +214,10 @@ public final class ScoreBoardOverlay implements HudElement, MovableHud {
         return isEnabled() && !rows.isEmpty() && Minecraft.getInstance().level != null;
     }
 
+    public static boolean wantsBackdrop() {
+        return get().hudVisible() && ScoreBoardModule.blurEnabled();
+    }
+
     @Override
     public void setHudPos(float x, float y) {
         posX = x;
@@ -230,12 +234,15 @@ public final class ScoreBoardOverlay implements HudElement, MovableHud {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, DeltaTracker dt) {
+        Probe.begin("hud.scoreboard");
         try {
             updateData();
             if (!hudVisible()) return;
             render(g);
         } catch (Throwable t) {
-            QplayerModClient.LOGGER.warn("[ScoreBoard] render error: {}", t.toString());
+            AdaptClient.LOGGER.warn("[ScoreBoard] render error: {}", t.toString());
+        } finally {
+            Probe.end("hud.scoreboard");
         }
     }
 
@@ -273,10 +280,10 @@ public final class ScoreBoardOverlay implements HudElement, MovableHud {
 
         Image backdrop = null;
         if (ScoreBoardModule.blurEnabled()) {
-            backdrop = BackdropBlurCapture.getBlurredImage(24f);
+            backdrop = BackdropBlurCapture.getBlurredImage();
             if (backdrop == null && !loggedBlurUnavailable) {
                 loggedBlurUnavailable = true;
-                QplayerModClient.LOGGER.warn("[ScoreBoard] backdrop blur unavailable");
+                AdaptClient.LOGGER.warn("[ScoreBoard] backdrop blur unavailable");
             }
         }
 
@@ -286,14 +293,13 @@ public final class ScoreBoardOverlay implements HudElement, MovableHud {
             //    经 bloom 模糊后就是一圈暗色投影 —— 不是主题色光晕！之前画成主题色，
             //    用户看到的"神秘主题色 bloom"就是这么来的）
             try {
-                ImageFilter blur = ImageFilter.makeBlur(6f, 6f, FilterTileMode.DECAL);
+                ImageFilter blur = CachedBlur.of(6f, FilterTileMode.DECAL);
                 Paint glowPaint = new Paint().setImageFilter(blur);
                 canvas.saveLayer(Rect.makeXYWH(-24, -24, w + 48, h + 48), glowPaint);
                 paint.setColor(0xC0000000);   // Rise rE: 黑 alpha 190
                 canvas.drawRRect(RRect.makeXYWH(1, 1, w - 2, h - 2, radius), paint);
                 canvas.restore();
                 glowPaint.close();
-                blur.close();
             } catch (Throwable ignored) {
             }
 
@@ -375,8 +381,8 @@ public final class ScoreBoardOverlay implements HudElement, MovableHud {
     @SuppressWarnings("unchecked")
     private static Map<String, String> themeScheme() {
         try {
-            Object inst = io.github.timer_err.qml4j.runtime.color.StyleManager.__instance();
-            if (inst instanceof io.github.timer_err.qml4j.runtime.color.StyleManager sm) {
+            Object inst = com.ylmac.adapt.theme.StyleManager.__instance();
+            if (inst instanceof com.ylmac.adapt.theme.StyleManager sm) {
                 Object scheme = sm.currentScheme.peek();
                 if (scheme instanceof Map<?, ?> m) {
                     return (Map<String, String>) m;
