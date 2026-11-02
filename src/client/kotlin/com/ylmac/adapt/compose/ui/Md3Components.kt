@@ -90,7 +90,7 @@ fun Md3TextField(
                 }
             },
         )
-        com.ylmac.adapt.render.Probe.hit("in.bind")
+        com.ylmac.adapt.render.profile.Probe.hit("in.bind")
     }
     DisposableEffect(focused, textInput) {
         if (focused) arm()

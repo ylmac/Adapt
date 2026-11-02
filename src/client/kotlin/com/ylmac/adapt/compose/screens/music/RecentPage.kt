@@ -15,9 +15,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3FilledButton
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 
-/** RecentPage.qml — netease listen history when signed in. */
+/** — netease listen history when signed in. */
 @Composable
 fun RecentPage(
     pc: PlayerController,

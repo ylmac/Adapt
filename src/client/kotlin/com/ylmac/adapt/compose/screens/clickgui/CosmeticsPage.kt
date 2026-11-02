@@ -43,8 +43,8 @@ import com.ylmac.adapt.compose.ui.Md3ScrollRail
 import com.ylmac.adapt.compose.ui.Md3StandardIconButton
 import com.ylmac.adapt.compose.ui.Md3Switch
 import com.ylmac.adapt.compose.ui.Md3TextField
-import com.ylmac.adapt.features.cosmetic.CosmeticLibrary
-import com.ylmac.adapt.features.module.impl.render.CosmeticsModule
+import com.ylmac.adapt.module.render.CosmeticLibrary
+import com.ylmac.adapt.module.render.CosmeticsModule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

@@ -1,7 +1,7 @@
 #version 330
 
-// Vanilla caster fragment — depth is the authoritative output (Beryl shadow.fsh).
-// Alpha cutout discards transparent texels (Beryl: alpha < 0.1).
+// Vanilla caster fragment — depth is the authoritative output (shadow.fsh).
+// Alpha cutout discards transparent texels (alpha < 0.1).
 
 uniform sampler2D Sampler0;
 

@@ -1,10 +1,10 @@
 #version 330 core
 
-// Sodium compressed terrain shadow caster — VERIFIED by ShadowSimVk.
-// Same as Beryl shadow.vsh: gl_Position = LightSpaceMat * pos, then
+// Sodium compressed terrain shadow caster — VERIFIED by .
+// Same as shadow.vsh: gl_Position = LightSpaceMat * pos, then
 // distortShadowClipPos (z*0.5+0.5), clamp to [0,1].
 // u_ProjectionMatrix = lightProjection
-// u_ModelViewMatrix  = lightView * T(camPos%2)
+// u_ModelViewMatrix = lightView * T(camPos%2)
 // position is WORLD-RELATIVE (u_RegionOffset + drawTranslation + local).
 
 #moj_import <sodium:globals.glsl>
@@ -41,8 +41,8 @@ void main() {
     vec3 translation = u_RegionOffset + _get_draw_translation(_draw_id);
     vec3 position = _vert_position + translation;
 
-    // Beryl shadow.vsh: LightSpaceMat * position, then z*0.5+0.5.
-    // **不做 Beryl 的 xy distort**：Beryl 的 receiver 也在顶点阶段 distort
+    // shadow.vsh: LightSpaceMat * position, then z*0.5+0.5.
+    // **不做 的 xy distort**： 的 receiver 也在顶点阶段 distort
     // （terrain.vsh:110），光栅线性插值误差两边抵消；Adapt 的 receiver 是延迟
     // 全屏 pass，只能逐像素精确求 distort，与这里的顶点+插值最多差 66 texel
     // ≈ 1.25 格（数值见 AdaptShadowMap.SHADOW_DISTORTION）。两边一起去掉才对齐。

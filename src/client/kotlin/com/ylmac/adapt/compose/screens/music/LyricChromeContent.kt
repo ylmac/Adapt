@@ -41,11 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3Icon
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 import kotlinx.coroutines.delay
 /**
- * 对齐 qml-retired/LyricOverlay.qml：
- * 横屏左半封面+标题+进度+运输，右半留给宿主逐字歌词；
+ * * 横屏左半封面+标题+进度+运输，右半留给宿主逐字歌词；
  * 竖屏标题在上、运输在下，中间透明。关闭是左上 expand_more。
  */
 @Composable
@@ -194,7 +193,7 @@ fun LyricChromeContent(
 
 @Composable
 private fun ThinProgress(progress: Float, pc: PlayerController, mod: Modifier) {
-    // 对齐 LinearProgress.qml：按下/拖动都 seek；松手后按住显示值，直到播放进度追上。
+    // ：按下/拖动都 seek；松手后按住显示值，直到播放进度追上。
     var override by remember { mutableStateOf<Float?>(null) }
     val shown = (override ?: progress).coerceIn(0f, 1f)
     LaunchedEffect(progress, override) {
@@ -218,7 +217,7 @@ private fun ThinProgress(progress: Float, pc: PlayerController, mod: Modifier) {
                         if (dur > 0L) pc.seek((v * dur).toLong())
                     } catch (_: Throwable) {
                     }
-                    com.ylmac.adapt.render.Probe.hit("lyric.seek")
+                    com.ylmac.adapt.render.profile.Probe.hit("lyric.seek")
                 }
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)

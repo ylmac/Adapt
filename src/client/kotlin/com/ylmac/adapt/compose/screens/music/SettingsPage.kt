@@ -41,13 +41,13 @@ import com.ylmac.adapt.compose.ui.Md3Slider
 import com.ylmac.adapt.compose.ui.Md3Switch
 import com.ylmac.adapt.compose.ui.Md3TextField
 import com.ylmac.adapt.config.DesktopSettings
-import com.ylmac.adapt.features.music.PlayerController
-import com.ylmac.adapt.features.music.customapi.CustomApiConfig
+import com.ylmac.adapt.module.misc.music.PlayerController
+import com.ylmac.adapt.module.misc.music.customapi.CustomApiConfig
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** SettingsPage.qml shell + every SettingsSection*.qml control. */
+/** shell + every SettingsSection*. control. */
 @Composable
 fun SettingsPage(
     pc: PlayerController,
@@ -670,7 +670,6 @@ private fun SettingsSectionWorldLyric(settings: DesktopSettings, tick: Int) {
 @Composable
 private fun SettingsSectionStorage(pc: PlayerController, settings: DesktopSettings, tick: Int) {
     var maxCache by remember(tick) { mutableIntStateOf(numPeek(settings.maxCacheSizeMB, 500)) }
-    var preload by remember(tick) { mutableStateOf(boolPeek(settings.qmlCachePreload)) }
     var cacheFolder by remember(tick) { mutableStateOf(strPeek(settings.cacheFolder)) }
     val cacheSize = numPeek(pc.cacheSizeMB)
 
@@ -694,14 +693,6 @@ private fun SettingsSectionStorage(pc: PlayerController, settings: DesktopSettin
                 } catch (_: Throwable) {
                 }
             }
-        }
-        SwitchRow(
-            "QML 缓存预加载",
-            "启动时把构建期预编译的 QML 缓存从 JAR 读入内存，打开界面时零磁盘 I/O，加载 <1ms",
-            preload,
-        ) {
-            preload = it
-            settings.qmlCachePreload.set(it)
         }
         Text("缓存目录", color = MonetScheme.onSurface, fontSize = 16.sp, fontFamily = MusicFonts.PingFang)
         Text(

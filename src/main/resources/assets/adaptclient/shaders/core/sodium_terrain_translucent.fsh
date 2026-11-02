@@ -14,7 +14,7 @@ in vec4 v_Color; // The interpolated vertex color
 in vec2 v_TexCoord; // The interpolated block texture coordinates
 in vec2 v_FragDistance; // The fragment's distance from the camera (cylindrical and spherical)
 in float fadeFactor;
-in vec4 adaptVertexLinear; // Adapt/Beryl：pow(2.2) 线性化顶点色
+in vec4 adaptVertexLinear; // Adapt/：pow(2.2) 线性化顶点色
 in vec3 adaptFragPos; // Adapt：视空间片元位置
 
 uniform sampler2D u_BlockTex; // The block texture
@@ -30,7 +30,7 @@ void main() {
     }
 #endif
 
-    // ---- Beryl 风格光照（半透明：视向量近似法线，稳定无 NaN）----
+    // ---- 风格光照（半透明：视向量近似法线，稳定无 NaN）----
     vec3 albedo = pow(color.rgb, vec3(2.2)) * adaptVertexLinear.rgb;
     vec3 V = -normalize(adaptFragPos);
     // 半透明面不重建法线：用视向量作为 N 的近似（diffuse 项稳定），
@@ -40,7 +40,7 @@ void main() {
     vec3 F0 = vec3(0.04);
     float roughness = 0.8;
 
-    // Beryl: radiance = LightColor * 0.6，随太阳贴近地平线衰减
+    // radiance = LightColor * 0.6，随太阳贴近地平线衰减
     vec3 radiance = SunColor * SunIntensity * 0.6;
     radiance *= adaptSaturate((dot(UpVector.xyz, SunDirection) - 0.04) * 50.0);
 

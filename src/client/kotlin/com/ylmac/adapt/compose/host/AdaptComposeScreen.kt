@@ -3,9 +3,9 @@ package com.ylmac.adapt.compose.host
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import com.ylmac.adapt.compose.theme.MonetScheme
-import com.ylmac.adapt.render.BackdropBlurCapture
-import com.ylmac.adapt.render.MinecraftSurfaceBackend
-import com.ylmac.adapt.render.WorldColorSampler
+import com.ylmac.adapt.render.hud.BackdropBlurCapture
+import com.ylmac.adapt.render.surface.MinecraftSurfaceBackend
+import com.ylmac.adapt.render.color.WorldColorSampler
 import io.github.humbleui.skija.BlendMode
 import io.github.humbleui.skija.Paint
 import io.github.humbleui.skija.Path
@@ -20,10 +20,10 @@ import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
-import org.lwjgl.glfw.GLFW
+import com.ylmac.adapt.input.GLFW
 
 /**
- * Compose 宿主（对齐 QmlScreen 面板几何 + 毛玻璃底 + idle 跳过）。
+ * Compose 宿主。
  */
 abstract class AdaptComposeScreen(
     title: String,
@@ -231,14 +231,14 @@ abstract class AdaptComposeScreen(
             s.dispatchMoveDesign(loc[0], loc[1])
         }
 
-        com.ylmac.adapt.render.Probe.begin("compose.session")
+        com.ylmac.adapt.render.profile.Probe.begin("compose.session")
         val drew = s.renderFrame(System.nanoTime())
-        com.ylmac.adapt.render.Probe.end("compose.session")
-        com.ylmac.adapt.render.Probe.hit(if (drew) "compose.drew" else "compose.skip")
+        com.ylmac.adapt.render.profile.Probe.end("compose.session")
+        com.ylmac.adapt.render.profile.Probe.hit(if (drew) "compose.drew" else "compose.skip")
         // 毛玻璃跟世界走，每帧采样。降频会把玻璃停在旧帧上，看起来像糊掉一层。
-        com.ylmac.adapt.render.Probe.begin("glass.update")
+        com.ylmac.adapt.render.profile.Probe.begin("glass.update")
         updateGlassBackdrop(s)
-        com.ylmac.adapt.render.Probe.end("glass.update")
+        com.ylmac.adapt.render.profile.Probe.end("glass.update")
         lastGlassNs = System.nanoTime()
 
         // 毛玻璃底 →（可选宿主层）→ Compose 面板
@@ -420,7 +420,6 @@ abstract class AdaptComposeScreen(
         glassEverDrawn = false
     }
 
-    /** 对齐 qml4j Renderer.eraseOutsideRoundRect：圆角外 CLEAR；Path/Paint 复用。 */
     protected fun eraseOutsideRoundRect(canvas: io.github.humbleui.skija.Canvas, w: Float, h: Float, r: Float) {
         if (w <= 0f || h <= 0f || r <= 0f) return
         try {

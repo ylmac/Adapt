@@ -27,7 +27,7 @@ import com.ylmac.adapt.compose.theme.MonetScheme
 import kotlin.math.roundToInt
 
 /**
- * MD3 Slider — 对齐 qml-retired Slider：触摸高 44、轨高 16、拇指 4×44（非圆形 Material）。
+ * MD3 Slider：触摸高 44、轨高 16、拇指 4×44。
  */
 @Composable
 fun Md3Slider(

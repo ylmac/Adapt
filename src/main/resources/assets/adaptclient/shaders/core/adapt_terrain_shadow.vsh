@@ -1,6 +1,6 @@
 #version 330
 
-// Vanilla terrain shadow caster (Beryl shadow.vsh chain, verified by ShadowSimVk).
+// Vanilla terrain shadow caster (shadow.vsh chain, verified by).
 // pos is world-relative (Position + chunk offset); LightViewProjection (with
 // T(camPos%2)) -> light clip; distort z.
 
@@ -20,7 +20,7 @@ void main() {
     vec3 worldRelPos = Position + (ChunkPosition - CameraBlockPos) + CameraOffset;
     vec4 clip = LightViewProjection * vec4(worldRelPos, 1.0);
     vec3 ndc = clip.xyz / clip.w;
-    // 不做 xy distort —— receiver 在延迟 pass 里只能逐像素求 distort，与顶点
+    // 不做 xy distort — receiver 在延迟 pass 里只能逐像素求 distort，与顶点
     // 阶段 + 光栅插值差最多 1.25 格（AdaptShadowMap.SHADOW_DISTORTION）。
     ndc.z = ndc.z * 0.5 + 0.5;
     gl_Position = vec4(ndc, 1.0);

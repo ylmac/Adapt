@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.retainedLayer
 
-/** QML PlaylistCard.qml — cover (tile−8) r14 icon queue_music 44, name 14, count 12. */
+/** — cover (tile−8) r14 icon queue_music 44, name 14, count 12. */
 @Composable
 fun PlaylistCard(
     name: String,

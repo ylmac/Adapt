@@ -43,8 +43,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.ylmac.adapt.compose.theme.AdaptTheme
 import com.ylmac.adapt.compose.theme.MonetScheme
-import com.ylmac.adapt.features.music.PlayerController
-import com.ylmac.adapt.render.AdaptRuntime
+import com.ylmac.adapt.module.misc.music.PlayerController
+import com.ylmac.adapt.render.screen.AdaptRuntime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -318,7 +318,7 @@ fun MusicShellContent() {
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .background(Color.Transparent), // 世界透过 + 宿主毛玻璃底（对齐 QML transparent root）
+                .background(Color.Transparent), // 世界透过 + 宿主毛玻璃底（transparent root）
         ) {
             val wide = maxWidth >= 600.dp
             val expanded = maxWidth >= 840.dp
@@ -572,7 +572,7 @@ fun MusicShellContent() {
                 }
             }
 
-            // Toast (Main.qml ToastStack above mini player)
+            // Toast (ToastStack above mini player)
             if (toastMsg.isNotBlank()) {
                 Box(
                     Modifier
@@ -586,7 +586,7 @@ fun MusicShellContent() {
                 }
             }
 
-            // 与 QML 一致：slide 可见时显示 chrome；Compose 在 fluid 之上（beforeComposePresent）
+            // 与 一致：slide 可见时显示 chrome；Compose 在 fluid 之上（beforeComposePresent）
             if (lyricsOpen || lyricSlide > 0.001f) {
                 val ease = lyricSlide * lyricSlide * (3f - 2f * lyricSlide)
                 val sliding = ease < 0.998f
@@ -778,7 +778,7 @@ private fun OverlaySlide(
     }
 }
 
-/** BottomNav.qml — 76 + inset, secondaryContainer pill 64×32. */
+/** — 76 + inset, secondaryContainer pill 64×32. */
 @Composable
 private fun MusicBottomNav(
     items: List<MusicNav>,
@@ -834,7 +834,7 @@ private fun MusicBottomNav(
     }
 }
 
-/** NavigationRail.qml — width 80, primary capsule 64×48. */
+/** — width 80, primary capsule 64×48. */
 @Composable
 private fun MusicNavRail(
     items: List<MusicNav>,

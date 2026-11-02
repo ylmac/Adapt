@@ -1,20 +1,20 @@
 package com.ylmac.adapt.render.clickgui;
 
 import com.ylmac.adapt.AdaptClient;
-import com.ylmac.adapt.features.module.Category;
-import com.ylmac.adapt.features.module.Module;
-import com.ylmac.adapt.features.module.ModuleManager;
-import com.ylmac.adapt.features.module.settings.Setting;
-import com.ylmac.adapt.features.module.settings.impl.BoolSetting;
-import com.ylmac.adapt.features.module.settings.impl.ButtonSetting;
-import com.ylmac.adapt.features.module.settings.impl.ChoiceSetting;
-import com.ylmac.adapt.features.module.settings.impl.ColorSetting;
-import com.ylmac.adapt.features.module.settings.impl.DoubleSetting;
-import com.ylmac.adapt.features.module.settings.impl.EnumSetting;
-import com.ylmac.adapt.features.module.settings.impl.IntSetting;
-import com.ylmac.adapt.features.module.settings.impl.StringSetting;
-import com.ylmac.adapt.render.MinecraftSurfaceBackend;
-import com.ylmac.adapt.render.SkijaNativeFix;
+import com.ylmac.adapt.module.Category;
+import com.ylmac.adapt.module.Module;
+import com.ylmac.adapt.module.ModuleManager;
+import com.ylmac.adapt.module.settings.Setting;
+import com.ylmac.adapt.module.settings.impl.BoolSetting;
+import com.ylmac.adapt.module.settings.impl.ButtonSetting;
+import com.ylmac.adapt.module.settings.impl.ChoiceSetting;
+import com.ylmac.adapt.module.settings.impl.ColorSetting;
+import com.ylmac.adapt.module.settings.impl.DoubleSetting;
+import com.ylmac.adapt.module.settings.impl.EnumSetting;
+import com.ylmac.adapt.module.settings.impl.IntSetting;
+import com.ylmac.adapt.module.settings.impl.StringSetting;
+import com.ylmac.adapt.render.surface.MinecraftSurfaceBackend;
+import com.ylmac.adapt.render.surface.SkijaNativeFix;
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.Font;
 import io.github.humbleui.skija.FontMgr;
@@ -31,7 +31,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.ylmac.adapt.input.GLFW;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 分栏列表 ClickGUI。栏宽、行高、薰衣草配色和操作沿用 Samsara 的列表界面：
  * 左键拖标题、右键收起栏；模块左键开关、右键展开、中键绑键。
  */
 public class ListClickGuiScreen extends Screen {

@@ -27,7 +27,7 @@ import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.retainedLayer
 
 /**
- * QML SongRow.qml — 64 tall, cover 48×48 r8, title 15 / artist 12.
+ * — 64 tall, cover 48×48 r8, title 15 / artist 12.
  * Cover sits inset so pill radius 12 − 4 = cover radius 8.
  */
 @Composable

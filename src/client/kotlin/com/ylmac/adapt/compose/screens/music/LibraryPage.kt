@@ -35,11 +35,11 @@ import androidx.compose.ui.window.Dialog
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3FilledButton
 import com.ylmac.adapt.compose.ui.Md3LoadingIndicator
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 import kotlin.math.floor
 import kotlin.math.max
 
-/** LibraryPage.qml — my playlists grid + FAB create + login CTA. */
+/** — my playlists grid + FAB create + login CTA. */
 @Composable
 fun LibraryPage(
     pc: PlayerController,

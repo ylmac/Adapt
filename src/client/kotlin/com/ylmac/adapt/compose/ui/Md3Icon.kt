@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.AdaptFonts
 
-/** Material Symbols ligature — `fontFeatureSettings = "liga"` 对齐 QML Theme.iconFont。 */
+/** Material Symbols ligature — `fontFeatureSettings = "liga"` Theme.iconFont。 */
 @Composable
 fun Md3Icon(
     name: String,

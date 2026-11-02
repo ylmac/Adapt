@@ -1,10 +1,6 @@
 #version 330
 
-// Adapt 天空盒管线片元着色器 —— Complementary Reimagined r5 天空系统移植
-// （SHADER_STYLE=4 / SUN_MOON_STYLE=2 / CLOUD_STYLE=3 / NIGHT_STAR_AMOUNT=2）。
-// 来源：lib/atmospherics/sky.glsl、stars.glsl、gbuffers_skybasic（程序化日月）、
-// lib/atmospherics/clouds/reimaginedClouds.glsl + mainClouds.glsl + cloudCoord.glsl、
-// lib/colors/skyColors.glsl + cloudColors.glsl + lightAndAmbientColors.glsl。
+// Adapt 天空盒片元着色器。日月、星星和体积云都在这一支里算。
 // 全部 uniform 因子从 AdaptLighting UBO 与 vanilla ColorModulator 推导；
 // 云噪声图（colortex3.b）与月面噪声（noisetex）用整数 hash 程序化等价替代，
 // 纯 Vulkan 单 pass，无前置 pass / 无纹理依赖。
@@ -21,7 +17,7 @@ in float cylindricalVertexDistance;
 
 out vec4 fragColor;
 
-// ---------- 通用小函数（Complementary commonFunctions.glsl） ----------
+// ---------- 通用小函数 ----------
 float sqrt1(float a) { return sqrt(a); }
 vec3 sqrt1(vec3 a) { return sqrt(a); }
 float pow2(float a) { return a * a; }
@@ -32,7 +28,7 @@ float smoothstep1(float a) { return a * a * (3.0 - 2.0 * a); }
 float GetLuminance(vec3 color) { return dot(color, vec3(0.2126, 0.7152, 0.0722)); }
 
 float GetHorizonFactor(float XdotU) {
-    // SUN_MOON_HORIZON 关闭分支（Reimagined 默认）
+    // SUN_MOON_HORIZON 关闭分支（默认）
     float horizon = min(XdotU + 1.0, 1.0);
     horizon *= horizon;
     horizon *= horizon;
@@ -55,12 +51,12 @@ float rainFactor2;
 float invRainFactor;
 float vsBrightness;
 float syncedTime;
-vec3 SunVecView; // 真实太阳方向（视空间，不随 Beryl 夜间翻转）——天空/星星/日月专用
+vec3 SunVecView; // 真实太阳方向（视空间，不随 夜间翻转）—天空/星星/日月专用
 
 void computeFactors() {
     // 真实太阳方向：SUN_ANGLE 0=正午 → timeAngle 0.25 → 仰角 0 → 世界方向 (0,1,0)。
     // ViewRotCol 是 viewRotationMatrix（视图→世界）的三列，dot(列, worldDir) =
-    // M^T * worldDir = 世界→视图 * worldDir = 视空间太阳方向（与 Beryl 一致）。
+    // M^T * worldDir = 世界→视图 * worldDir = 视空间太阳方向（与 一致）。
     float timeAngle = SkyFactors0.y;
     float elevAngle = (timeAngle - 0.25) * 6.28318530718;
     vec3 worldSunDir = vec3(sin(elevAngle), cos(elevAngle), 0.0);
@@ -84,12 +80,12 @@ void computeFactors() {
     rainFactor = SkyFactors0.x;
     rainFactor2 = rainFactor * rainFactor;
     invRainFactor = 1.0 - rainFactor;
-    // vsBrightness 由 MinAmbientLight = gamma*0.05+0.01 反推（Beryl 公式）
+    // vsBrightness 由 MinAmbientLight = gamma*0.05+0.01 反推（公式）
     vsBrightness = clamp((MinAmbientLight - 0.01) * 20.0, 0.0, 1.0);
-    syncedTime = GameTime * 1200.0; // Complementary syncedTime 的帧内等价（世界时间漂移）
+    syncedTime = GameTime * 1200.0; // syncedTime 的帧内等价（世界时间漂移）
 }
 
-// ---------- skyColors.glsl（OVERWORLD） ----------
+// ---------- （OVERWORLD） ----------
 vec3 dayUpSkyColor;
 vec3 dayMiddleSkyColor;
 vec3 dayDownSkyColor;
@@ -187,7 +183,7 @@ vec3 GetSky(float VdotU, float VdotS, float dither, bool doGlare, bool doGround)
     return finalSky;
 }
 
-// ---------- stars.glsl（程序化星星） ----------
+// ---------- （程序化星星） ----------
 float GetStarNoise(vec2 pos) {
     return fract(sin(dot(pos, vec2(12.9898, 4.1414))) * 43758.54953);
 }
@@ -226,7 +222,7 @@ vec3 GetStars(vec2 starCoord, float VdotU, float VdotS) {
     star *= GetStarNoise(starCoord.xy + 0.1);
     star *= GetStarNoise(starCoord.xy + 0.23);
 
-    star -= 0.7; // NIGHT_STAR_AMOUNT == 2（Reimagined 默认）
+    star -= 0.7; // NIGHT_STAR_AMOUNT == 2（默认）
     star = max0(star);
     star *= star;
 
@@ -255,16 +251,15 @@ float valueNoise(vec2 p) {
 }
 
 float cloudNoiseSample(vec2 coord) {
-    // Complementary colortex3.b 的程序化等价：多八度 value noise（256 周期云图）。
+    // colortex3.b 的程序化等价：多八度 value noise（256 周期云图）。
     // coord 先 wrap 到 0..1（纹理 repeat 寻址等价），输入坐标压到 0..256 以内
-    // 保证 hash 精度；基频 8 块/图对齐 Complementary 云图的大块形态。
+    // 保证 hash 精度；基频 8 块/图对齐 云图的大块形态。
     vec2 p = fract(coord) * 256.0;
     return valueNoise(p * 0.03125) * 0.50   // 8 周期大块
          + valueNoise(p * 0.09375) * 0.30   // 24 周期
          + valueNoise(p * 0.28125) * 0.20;  // 72 周期细节
 }
 
-// ---------- cloudCoord.glsl ----------
 const float cloudNarrowness = 0.07;
 
 vec2 GetRoundedCloudCoord(vec2 pos, float cloudRoundness) {
@@ -296,7 +291,7 @@ vec3 nightMiddleSkyColorRef() {
     return sqrt(nightUpSkyColor) * 0.65;
 }
 
-// ---------- cloudColors.glsl（DEFERRED1 云用颜色） ----------
+// ---------- （DEFERRED1 云用颜色） ----------
 vec3 cloudLightColor;
 vec3 cloudAmbientColor;
 
@@ -331,7 +326,6 @@ void computeCloudColors() {
     cloudAmbientColor *= 1.0 - 0.25 * rainFactor; // CLOUDS_REIMAGINED
 }
 
-// ---------- reimaginedClouds.glsl ----------
 const float cloudStretch = 4.2;
 const float cloudTallness = cloudStretch * 2.0;
 const float cloudRoundness = 0.125;
@@ -367,7 +361,7 @@ vec4 GetVolumetricClouds(int cloudAltitude, float distanceThreshold, float skyFa
     float skyFadeM = mix(skyFade, 1.0, 0.4 * max(aboveClouds, rainFactor2));
 
     int sampleCount = max(int(planeDistanceDif) / 8, 12);
-    sampleCount = min(sampleCount, 64); // Adapt 性能上限（Complementary CLOUD_QUALITY 2 等效）
+    sampleCount = min(sampleCount, 64); // Adapt 性能上限（ CLOUD_QUALITY 2 等效）
 
     float stepMult = planeDistanceDif / float(sampleCount);
     vec3 traceAdd = nPlayerPos * stepMult;
@@ -400,7 +394,7 @@ vec4 GetVolumetricClouds(int cloudAltitude, float distanceThreshold, float skyFa
             float gradientNoise = InterleavedGradientNoiseForClouds(gl_FragCoord.xy);
 
             vec3 cLightPos = tracePosM;
-            vec3 cLightPosAdd = SunVecView * vec3(0.08); // 视空间太阳方向（Complementary lightVec 等价）
+            vec3 cLightPosAdd = SunVecView * vec3(0.08); // 视空间太阳方向（ lightVec 等价）
             cLightPosAdd *= shadowTime;
 
             float light = 2.0;
@@ -433,7 +427,7 @@ vec4 GetVolumetricClouds(int cloudAltitude, float distanceThreshold, float skyFa
     return volumetricClouds;
 }
 
-// ---------- main：Complementary gbuffers_skybasic + deferred1 云合成 ----------
+// ---------- main： + deferred1 云合成 ----------
 void main() {
     computeFactors();
     computeSkyColors();
@@ -444,7 +438,7 @@ void main() {
     float VdotU = dot(viewDir, UpVector.xyz);
     float VdotS = dot(viewDir, SunVecView);
 
-    // 天空渐变 + glare（Complementary GetSky）
+    // 天空渐变 + glare（ GetSky）
     vec3 color = GetSky(VdotU, VdotS, dither, true, false);
 
     // 程序化星星（原版星星由 STARS 管线 discard 移除）
@@ -488,7 +482,7 @@ void main() {
 
                 float ang = fract(timeAngle - (0.25 + moonPhaseOffset));
                 ang = (ang + (cos(ang * 3.14159265358979) * -0.5 + 0.5 - ang) / 3.0) * 6.28318530717959;
-                // sunPathRotation = 0（Complementary 默认）
+                // sunPathRotation = 0（ 默认）
                 vec3 worldMoonVec = vec3(-sin(ang), cos(ang), 0.0) * 2000.0;
                 vec3 rawSunVec2 = vec3(dot(ViewRotCol0.xyz, worldMoonVec),
                                        dot(ViewRotCol1.xyz, worldMoonVec),
@@ -502,7 +496,7 @@ void main() {
         }
     }
 
-    // Reimagined volumetric clouds run in the opaque-after/deferred fullscreen pass.
+    // volumetric clouds run in the opaque-after/deferred fullscreen pass.
     // They must see opaque depth and cannot be evaluated correctly in a sky-dome draw.
     // SKY fan 的有限边界必须按 vanilla FogSkyEnd 淡出到 framebuffer clear 色，
     // 否则夜间会露出八边形天空穹接缝。

@@ -57,7 +57,7 @@ void main() {
     // Transform the vertex position into model-view-projection space
     gl_Position = u_ProjectionMatrix * u_ModelViewMatrix * vec4(position, 1.0);
 
-    // ---- Adapt/Beryl 顶点阶段光照分解（半透明保留 alpha）----
+    // ---- Adapt/ 顶点阶段光照分解（半透明保留 alpha）----
     adaptVertexLinear = vec4(pow(_vert_color.rgb, vec3(2.2)), _vert_color.a);
     adaptFragPos = (u_ModelViewMatrix * vec4(position, 1.0)).xyz;
 

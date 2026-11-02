@@ -2,13 +2,13 @@ package com.ylmac.adapt.config;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.ylmac.adapt.features.music.cache.DiskCache;
-import com.ylmac.adapt.features.music.customapi.CustomApiConfig;
-import com.ylmac.adapt.features.music.lyric.skia.Fonts;
-import com.ylmac.adapt.features.music.lyric.skia.LyricCompositor;
-import com.ylmac.adapt.features.music.lyric.skia.LyricConfig;
-import com.ylmac.adapt.config.store.AppDirs;
-import com.ylmac.adapt.bind.Slot;
+import com.ylmac.adapt.module.misc.music.cache.DiskCache;
+import com.ylmac.adapt.module.misc.music.customapi.CustomApiConfig;
+import com.ylmac.adapt.module.misc.music.lyric.skia.Fonts;
+import com.ylmac.adapt.module.misc.music.lyric.skia.LyricCompositor;
+import com.ylmac.adapt.module.misc.music.lyric.skia.LyricConfig;
+import com.ylmac.adapt.config.AppDirs;
+import com.ylmac.adapt.config.Slot;
 
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -20,29 +20,31 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import com.ylmac.adapt.features.music.PlayerController;
+import com.ylmac.adapt.module.misc.music.PlayerController;
 import com.ylmac.adapt.AdaptClient;
 import com.ylmac.adapt.theme.StyleManager;
-import com.ylmac.adapt.render.WorldColorSampler;
+import com.ylmac.adapt.render.color.WorldColorSampler;
+import com.ylmac.adapt.render.color.CoverSeedSampler;
+import com.ylmac.adapt.render.hud.HudEditor;
 
 public final class DesktopSettings implements LyricCompositor.SettingsBridge {
 
     // Appearance
-    // darkMode: 0=跟随系统 1=浅色 2=深色 3=主题色(surface+primary混合, PixelPlayer风格)
+    // darkMode: 0=跟随系统 1=浅色 2=深色 3=主题色(surface 与 primary 混合)
     public final Slot<Number> darkMode = new Slot<>(0);
     public final Slot<Boolean> monetEnabled = new Slot<>(true);
     /** 莫奈取色来源：0=歌曲封面 1=世界背景（默认世界） */
     /**
-     * 主题取色来源：0 = 音乐封面（**默认**）、1 = 世界采样。
-     * 世界取色只在 Interface 模块的 Debug 打开时才生效（见 WorldColorSampler/CoverSeedSampler）。
-     */
+ * 主题取色来源：0 = 音乐封面（**默认**）、1 = 世界采样。
+ * 世界取色只在 Interface 模块的 Debug 打开时才生效（见 WorldColorSampler/CoverSeedSampler）。
+ */
     public final Slot<Number> monetSource = new Slot<>(0);
 
     /**
-     * Debug 模式：**详细/危险选项的总开关**（持久化）。
-     * 目前包含：取色来源（世界取色，已废弃，仅调试可用）。
-     * 真源在这里，InterfaceModule.isDebug() 读它。
-     */
+ * Debug 模式：**详细/危险选项的总开关**（持久化）。
+ * 目前包含：取色来源（世界取色，已废弃，仅调试可用）。
+ * 真源在这里，InterfaceModule.isDebug 读它。
+ */
     public final Slot<Boolean> debugMode = new Slot<>(false);
     // 已移除 monetTransitionMs（颜色过渡时长）：过渡功能按用户要求关闭，
     // 新种子直接落地，见 WorldColorSampler.consumePendingSeed。旧配置文件里的
@@ -87,18 +89,13 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
 
     // Cache
     public final Slot<Number> maxCacheSizeMB = new Slot<>(500);
-    /** 构建期预置 QML 缓存预加载到内存（打开后 QML 加载零磁盘 I/O） */
-    public final Slot<Boolean> qmlCachePreload = new Slot<>(true);
 
     // Storage
     public final Slot<String> musicFolder = new Slot<>("");
     public final Slot<String> cacheFolder = new Slot<>("");
 
-    // 自定义 API 音源（第三方音乐 API 适配）：QML 直接绑定到
-    // settings.customApiConfig.<字段> 的嵌套字段；字段级编辑不触发 Property
-    // 通知（qml4j 对普通字段走反射直写），由 QML 侧在编辑后调用
-    // saveCustomApiConfig() 持久化；PlayerController 构造时持有同一实例，
-    // 字段级编辑实时生效。
+    // 自定义 API 音源。字段级编辑不触发通知，编辑后调用 saveCustomApiConfig 持久化。
+    // PlayerController 持有同一实例，字段级编辑实时生效。
     public final Slot<CustomApiConfig> customApiConfig = new Slot<>(new CustomApiConfig());
 
     // Layout
@@ -107,17 +104,17 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
     /** 显示导航栏「本地」标签（关闭后隐藏底部/侧栏本地入口） */
     public final Slot<Boolean> showLocalTab = new Slot<>(true);
     /**
-     * HUD 位置编辑器的布局（JSON：元素 id → [x, y]，GUI 坐标）。
-     * 由 {@code HudEditor} 在按 ESC 退出编辑态时写入；模块设置本身不持久化，
-     * 所以位置只能存这里。
-     */
+ * HUD 位置编辑器的布局（JSON：元素 id → [x, y]，GUI 坐标）。
+ * 由 {@code HudEditor} 在按 ESC 退出编辑态时写入；模块设置本身不持久化，
+ * 所以位置只能存这里。
+ */
     public final Slot<String> hudLayout = new Slot<>("");
     /** HUD 编辑器的 5 个配置档。JSON：档位 → 一份和 hudLayout 一样的布局。 */
     public final Slot<String> hudProfiles = new Slot<>("");
 
     // Runtime
     public final Slot<Boolean> showLyrics = new Slot<>(true);
-    /** 世界内歌词对齐：0=左 1=中 2=右（默认右对齐，右下角面板观感） */
+    /** 世界内歌词：0=左 1=中 2=右（默认右，右下角面板观感） */
     public final Slot<Number> worldLyricAlign = new Slot<>(2);
     /** 世界内歌词字号（px，独立于桌面歌词，默认 28） */
     public final Slot<Number> worldLyricFontSize = new Slot<>(28);
@@ -136,17 +133,17 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
         musicFolder.set(home + "/Music");
         cacheFolder.set(home + "/.qplayer/cache");
 
-        // darkMode 监听器必须在 load() 之前注册——load() 会调 applyInt → darkMode.set(savedValue)，
+        // darkMode 监听器必须在 load 之前注册—load 会调 applyInt → darkMode.set(savedValue)，
         // 如果监听器在 load 之后才注册，初始加载的值不会触发监听器 → isDarkTheme 永远是默认值 FALSE
         darkMode.addListener(mode -> {
             int m = mode == null ? 0 : mode.intValue();
             boolean dark = resolveDarkMode(m);
             resolvedDark.set(dark);
             // darkMode=3 (主题色) → StyleManager 启用 themedSurface
-            // → scheme 的 surface/background 全部替换为 primary 混合 → 所有 QML 自动跟随
+            // → scheme 的 surface/background 全部替换为 primary 混合 → 所有 自动跟随
             try {
                 Object sm = com.ylmac.adapt.theme.StyleManager.__instance();
-                // 必须在 Java 层设置 isDarkTheme——QML Binding 太晚（QML 加载后才触发）
+                // 必须在 Java 层设置 isDarkTheme— Binding 太晚（加载后才触发）
                 ((com.ylmac.adapt.theme.StyleManager) sm)
                     .isDarkTheme.set(dark);
                 ((com.ylmac.adapt.theme.StyleManager) sm)
@@ -190,7 +187,6 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
         addAutoSave(showRomaji);
         addAutoSave(showTranslation);
         addAutoSave(maxCacheSizeMB);
-        addAutoSave(qmlCachePreload);
         addAutoSave(musicFolder);
         addAutoSave(cacheFolder);
         addAutoSave(worldLyricAlign);
@@ -203,13 +199,13 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
         addAutoSave(hudProfiles);
         addAutoSave(customApiConfig);
 
-        // 已安装字体族列表（字体选择对话框用）：FontMgr 未就绪（QML 构建期）时静默为空
+        // 已安装字体族列表（字体选择对话框用）：FontMgr 未就绪（构建期）时静默为空
         try {
             availableFontFamilies.set(Collections.unmodifiableList(Arrays.asList(Fonts.listFamilies())));
         } catch (Throwable ignored) {
             availableFontFamilies.set(Collections.emptyList());
         }
-        // 初始应用持久化的字体选择（load() 已在上面完成，listener 在 load 后注册，
+        // 初始应用持久化的字体选择（load 已在上面完成，listener 在 load 后注册，
         // 所以这里手动同步一次；Fonts.setSelection 内部对失败选择回退内置字体）
         applyFontSelection();
         fontSelection.addListener(v -> { if (!loading) applyFontSelection(); });
@@ -234,7 +230,7 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
     }
 
     /** 把当前字体选择应用到 Skia 渲染器（Fonts.setSelection，实时生效）；
-     *  构建期/无 Skia 原生库时静默忽略。 */
+ * 构建期/无 Skia 原生库时静默忽略。 */
     private void applyFontSelection() {
         try {
             String sel = fontSelection.get();
@@ -402,7 +398,7 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
     @Override public float topInset() { return topInset.get() == null ? 0f : topInset.get().floatValue(); }
     @Override public boolean lyricBgStatic() { return lyricBgStatic.get(); }
 
-    /** ClickGUI 毛玻璃：投影开关（QML 直接读 Property，这里给 Java 侧用） */
+    /** ClickGUI 毛玻璃：投影开关（直接读 Property，这里给 Java 侧用） */
     public boolean glassShadow() { return glassShadow.get(); }
 
     /** ClickGUI 毛玻璃：发光（bloom）开关 */
@@ -445,10 +441,10 @@ public final class DesktopSettings implements LyricCompositor.SettingsBridge {
     /** 字体选择入口（FontPickerDialog 调用）：""=内置，"system"=系统默认，否则为字体族名 */
     public void setFontSelection(String family) { fontSelection.set(family == null ? "" : family); }
 
-    /** 当前字体选择（方法式读取，与 fontSelection Property 等价；QML 读 Property 更利于绑定响应） */
+    /** 当前字体选择（方法式读取，与 fontSelection Property 等价； 读 Property 更利于绑定响应） */
     public String fontFamily() { return fontSelection.get() == null ? "" : fontSelection.get(); }
 
-    /** QML 在编辑 settings.customApiConfig 的嵌套字段后调用：持久化当前配置
-     *  （嵌套字段的普通反射直写不会触发 Property 监听 → 不会 autoSave）。 */
+    /** 在编辑 settings.customApiConfig 的嵌套字段后调用：持久化当前配置
+ * （嵌套字段的普通反射直写不会触发 Property 监听 → 不会 autoSave）。 */
     public void saveCustomApiConfig() { save(); }
 }

@@ -10,7 +10,6 @@ object AdaptFonts {
     val MaterialSymbolsRounded: FontFamily by lazy {
         loadIconFamily(
             "MaterialSymbolsRounded",
-            "/assets/adaptclient/qml-retired/fonts/MaterialSymbolsRounded.ttf",
             "/assets/adaptclient/fonts/MaterialSymbolsRounded.ttf",
         )
     }
@@ -19,11 +18,9 @@ object AdaptFonts {
         loadWeightedFamily(
             identity = "PingFangSC",
             regularPaths = arrayOf(
-                "/assets/adaptclient/qml-retired/fonts/PingFangSC-Regular.otf",
                 "/assets/adaptclient/fonts/PingFangSC-Regular.otf",
             ),
             mediumPaths = arrayOf(
-                "/assets/adaptclient/qml-retired/fonts/PingFangSC-Medium.otf",
                 "/assets/adaptclient/fonts/PingFangSC-Medium.otf",
             ),
         )

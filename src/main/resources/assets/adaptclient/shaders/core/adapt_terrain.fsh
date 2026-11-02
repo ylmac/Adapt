@@ -1,14 +1,14 @@
 #version 330
 
-// Adapt 自有地形管线片元着色器（Beryl terrain.fsh 逐行移植）。
-// 光照公式（Beryl terrain.fsh main，线性空间）：
-//   color1 = LightingSphereGGX2(..., radiance = LightColor*0.6 * horizonSaturate)
-//   color.rgb = (color1 * shadow * light.z) + albedo * (light.y*Ambient + light.x*暖光)
-//             + radiance * 0.1 * NdotU * albedo * shadow * light.z   (地面反弹项)
-// 注意：地形法线不在原版顶点格式里，Beryl 用自定义扩展顶点格式携带 Normal；
+// Adapt 地形管线片元着色器。
+// 光照公式（线性空间）：
+// color1 = LightingSphereGGX2(..., radiance = LightColor*0.6 * horizonSaturate)
+// color.rgb = (color1 * shadow * light.z) + albedo * (light.y*Ambient + light.x*暖光)
+// + radiance * 0.1 * NdotU * albedo * shadow * light.z (地面反弹项)
+// 注意：地形法线不在原版顶点格式里， 用自定义扩展顶点格式携带 Normal；
 // 26.2 原版 TERRAIN 格式无法追加属性（section 缓存已烘焙），因此这里用
-// 解析导数 dFdx/dFdy 从视空间深度重建法线（Beryl 无此路径，属 Adapt 适配）。
-// 输出经 Beryl final.fsh 的 aces + pow(1/2.2)，与实体一致。
+// 解析导数 dFdx/dFdy 从视空间深度重建法线（无此路径，属 Adapt 适配）。
+// 输出经 final.fsh 的 aces + pow(1/2.2)，与实体一致。
 
 #moj_import <minecraft:fog.glsl>
 #moj_import <minecraft:globals.glsl>
@@ -117,10 +117,10 @@ void main() {
     vec3 F0 = vec3(0.04);
     float roughness = 0.8;
 
-    // Beryl terrain.fsh：线性空间 albedo
+    // terrain.fsh：线性空间 albedo
     vec3 albedo = pow(albedoSRGB, vec3(2.2));
 
-    // Beryl: radiance = LightColor * 0.6，随太阳贴近地平线衰减
+    // radiance = LightColor * 0.6，随太阳贴近地平线衰减
     vec3 radiance = SunColor * SunIntensity * 0.6;
     radiance *= adaptSaturate((dot(UpVector.xyz, SunDirection) - 0.04) * 50.0);
 
@@ -131,7 +131,7 @@ void main() {
             + albedo * (adaptLightRaw.y * AmbientColor
                     + adaptLightRaw.x * vec3(1.0, 0.7, 0.5));
 
-    // Beryl 地面反弹项：NdotU 上表面受光 +10%
+    // 地面反弹项：NdotU 上表面受光 +10%
     float NdotU = max(dot(N, UpVector.xyz), 0.0);
     lit += radiance * 0.1 * NdotU * albedo * adaptLightRaw.z;
 

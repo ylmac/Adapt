@@ -24,9 +24,9 @@ import androidx.compose.ui.window.Dialog
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3FilledButton
 import com.ylmac.adapt.compose.ui.Md3TextField
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 
-/** ListenTogetherDialog.qml — create / join / leave room. */
+/** — create / join / leave room. */
 @Composable
 fun ListenTogetherDialog(
     open: Boolean,

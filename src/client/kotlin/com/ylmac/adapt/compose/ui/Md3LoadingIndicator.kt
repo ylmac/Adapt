@@ -26,7 +26,6 @@ import kotlin.math.floor
 import kotlin.math.sin
 
 /**
- * 严格对齐 qml-retired/md3/Core/LoadingIndicator.qml：
  * lobeSequence [10,9,5,2,8,4,2]，填充 polar blob，3000ms 旋转 + morph。
  *
  * [running]=false 时不建 InfiniteTransition，避免挡 Compose idle skip。
@@ -46,7 +45,7 @@ fun Md3LoadingIndicator(
 
 @Composable
 private fun Md3LoadingIndicatorAnimated(mod: Modifier, withContainer: Boolean) {
-    val spin = rememberInfiniteTransition(label = "qmlLoad")
+    val spin = rememberInfiniteTransition(label = "loadSpin")
     val rotation by spin.animateFloat(
         initialValue = 0f,
         targetValue = 360f,

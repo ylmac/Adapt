@@ -1,13 +1,13 @@
 package com.ylmac.adapt.compose.skia
 
 import com.ylmac.adapt.AdaptClient
-import com.ylmac.adapt.render.VulkanDeviceHandles
+import com.ylmac.adapt.render.surface.VulkanDeviceHandles
 import org.jetbrains.skia.DirectContext
 
 /**
  * Skiko（`org.jetbrains.skia`）Vulkan DirectContext。
  *
- * 与 QML 的 HumbleUI DirectContext **不是同一个对象**，但共用
+ * 与 的 HumbleUI DirectContext **不是同一个对象**，但共用
  * [VulkanDeviceHandles] 偷到的原版 Vulkan 队列句柄。
  */
 object ComposeSkiaContext {

@@ -34,7 +34,7 @@ import com.ylmac.adapt.compose.theme.MonetScheme
 import kotlin.math.roundToInt
 
 /**
- * MD3 SegmentedButton — 对齐 qml-retired：高 40、轨 surfaceContainerHighest、
+ * MD3 SegmentedButton：高 40、轨 surfaceContainerHighest、
  * 选中 primary 滑块动画、outline 描边。
  */
 @Composable

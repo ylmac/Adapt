@@ -33,9 +33,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3LoadingIndicator
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 
-/** PlaylistDetailPage.qml — back/title + 心动推荐/bookmark/cover/delete + tracks. */
+/** — back/title + 心动推荐/bookmark/cover/delete + tracks. */
 @Composable
 fun PlaylistDetailPage(
     pc: PlayerController,

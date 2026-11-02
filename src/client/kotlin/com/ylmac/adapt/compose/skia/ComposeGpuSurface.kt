@@ -1,7 +1,7 @@
 package com.ylmac.adapt.compose.skia
 
 import com.ylmac.adapt.AdaptClient
-import com.ylmac.adapt.render.GpuSharedTexture
+import com.ylmac.adapt.render.surface.GpuSharedTexture
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.resources.Identifier
@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicLong
  * Compose → 共享 [GpuSharedTexture] 的零拷贝 present。
  *
  * Skia GPU 表面固定预乘 alpha，blit 走 [RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA]
- *（与 [com.ylmac.adapt.render.MinecraftSurfaceBackend] 一致）。
+ *（与 [com.ylmac.adapt.render.surface.MinecraftSurfaceBackend] 一致）。
  */
 class ComposeGpuSurface(
     private val name: String,

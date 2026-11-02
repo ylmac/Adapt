@@ -1,6 +1,6 @@
 package com.ylmac.adapt.theme;
 
-import com.ylmac.adapt.bind.Slot;
+import com.ylmac.adapt.config.Slot;
 import com.ylmac.adapt.theme.color.Hct;
 import com.ylmac.adapt.theme.color.Scheme;
 
@@ -8,9 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 主题色。取色算法留在这边，不再经过 qml4j。
- */
 public final class StyleManager {
 
     private static StyleManager instance;

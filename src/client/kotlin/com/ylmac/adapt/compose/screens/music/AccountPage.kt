@@ -31,9 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.ylmac.adapt.compose.theme.MonetScheme
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 
-/** AccountPage.qml — profile / stats / logout. */
+/** — profile / stats / logout. */
 @Composable
 fun AccountPage(
     pc: PlayerController,

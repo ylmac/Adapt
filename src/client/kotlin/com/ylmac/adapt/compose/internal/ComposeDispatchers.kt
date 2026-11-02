@@ -12,18 +12,18 @@ import kotlin.coroutines.CoroutineContext
  *
  * 壳阶段规则：
  * - [AdaptComposeSession] / ImageComposeScene 的 `render`、`sendPointerEvent`、
- *   `setContent` **只**在 MC 渲染线程调用。
+ * `setContent` **只**在 MC 渲染线程调用。
  * - UI 状态（如 Smoke 计数）只在同一线程写入。
  * - [FrameRecomposer] 要求 coroutineContext 含 [ContinuationInterceptor]；
- *   这里用立即执行的 dispatcher，避免 hop 到 AWT 队列。
+ * 这里用立即执行的 dispatcher，避免 hop 到 AWT 队列。
  */
 object ComposeDispatchers {
     const val POLICY = "mc-render-thread-immediate"
 
     /**
-     * 在调用线程同步跑完 block（MC 渲染线程亲和）。
-     * 满足 FrameRecomposer 对 ContinuationInterceptor 的硬性要求。
-     */
+ * 在调用线程同步跑完 block（MC 渲染线程亲和）。
+ * 满足 FrameRecomposer 对 ContinuationInterceptor 的硬性要求。
+ */
     val Immediate: CoroutineDispatcher = object : CoroutineDispatcher() {
         override fun dispatch(context: CoroutineContext, block: Runnable) {
             block.run()

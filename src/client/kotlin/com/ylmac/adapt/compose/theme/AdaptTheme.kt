@@ -9,7 +9,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.config.DesktopSettings
-import com.ylmac.adapt.render.AdaptScreen
+import com.ylmac.adapt.compose.screens.music.AdaptScreen
 
 @Composable
 fun AdaptTheme(content: @Composable () -> Unit) {

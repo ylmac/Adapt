@@ -8,7 +8,7 @@ import java.awt.Component
 import java.awt.event.KeyEvent as AwtKeyEvent
 import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent as McKeyEvent
-import org.lwjgl.glfw.GLFW
+import com.ylmac.adapt.input.GLFW
 
 /**
  * MC 键盘 → Compose [sendKeyEvent]。
@@ -22,7 +22,7 @@ object KeyInputBridge {
 
     fun keyPressed(session: AdaptComposeSession?, event: McKeyEvent): Boolean {
         val s = session ?: return false
-        com.ylmac.adapt.render.Probe.hit("in.key")
+        com.ylmac.adapt.render.profile.Probe.hit("in.key")
         val awtCode = scancodeToAwt(event.key())
         if (awtCode == AwtKeyEvent.VK_UNDEFINED) return false
         // 可打印字符走 SDL text input → charTyped（26.3 与 keyPressed 是两条回调）。
@@ -84,18 +84,18 @@ object KeyInputBridge {
 
     fun charTyped(session: AdaptComposeSession?, event: CharacterEvent): Boolean {
         val s = session ?: return false
-        com.ylmac.adapt.render.Probe.hit("in.char")
+        com.ylmac.adapt.render.profile.Probe.hit("in.char")
         val cp = event.codepoint()
         if (cp < 32 || cp == 0x7F || cp > 0xFFFF) {
-            com.ylmac.adapt.render.Probe.hit("in.charReject")
+            com.ylmac.adapt.render.profile.Probe.hit("in.charReject")
             return false
         }
         // 优先走 TextInputService / startInputMethod（Compose 1.13 TextField 主路径）
         if (s.commitTextCodePoint(cp)) {
-            com.ylmac.adapt.render.Probe.hit("in.commitOk")
+            com.ylmac.adapt.render.profile.Probe.hit("in.commitOk")
             return true
         }
-        com.ylmac.adapt.render.Probe.hit("in.commitMiss")
+        com.ylmac.adapt.render.profile.Probe.hit("in.commitMiss")
         val ch = cp.toChar()
         val awt = AwtKeyEvent(
             dummy,

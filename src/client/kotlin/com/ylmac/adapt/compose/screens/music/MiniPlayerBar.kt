@@ -29,7 +29,7 @@ import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3LoadingIndicator
 
 /**
- * Exact MiniPlayer.qml:
+ * Exact:
  * 64-tall, r16, surfaceContainerHighest@0.75
  * [44-circle cover][12][title/artist][8][36 一起听][8][36 play][8][36 prev][8][36 next +12]
  */
@@ -131,7 +131,7 @@ fun MiniPlayerBar(
             )
             Spacer(Modifier.width(8.dp))
         }
-        // Transport order in QML: play left of prev left of next (anchored right).
+        // Transport order in: play left of prev left of next (anchored right).
         PlaybackCircle(
             icon = if (playing) "pause" else "play_arrow",
             iconSize = 22,

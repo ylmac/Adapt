@@ -108,9 +108,9 @@ object PointerInputBridge {
         )
 
     /**
-     * 鼠标一格大约 20 像素。不足一格的是触控板，按比例走；单次最多 32，
-     * 免得一串大增量把列表甩出去。Y 的方向在调用处取反。
-     */
+ * 鼠标一格大约 20 像素。不足一格的是触控板，按比例走；单次最多 32，
+ * 免得一串大增量把列表甩出去。Y 的方向在调用处取反。
+ */
     private fun wheelPx(raw: Double): Float {
         if (raw == 0.0) return 0f
         val magnitude = kotlin.math.abs(raw)

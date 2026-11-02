@@ -22,7 +22,7 @@ import kotlin.math.abs
 fun Modifier.retainedLayer(): Modifier = this.graphicsLayer()
 
 /**
- * 比默认更“收”的 fling：摩擦略高，减少 QML→Compose 后拖尾过长的怪异感。
+ * 比默认更“收”的 fling：摩擦略高，减少 →Compose 后拖尾过长的怪异感。
  */
 @Composable
 fun rememberAdaptFlingBehavior(): FlingBehavior {

@@ -127,10 +127,10 @@ class AdaptTextInput : PlatformTextInputService {
                 // (x1, y1, x2, y2)，给 IME 候选窗一个落点
                 mgr.setTextInputArea(w / 8, top, w * 7 / 8, top + 36)
                 mgr.onTextInputFocusChange(this, true)
-                com.ylmac.adapt.render.Probe.hit("in.sdlOn")
+                com.ylmac.adapt.render.profile.Probe.hit("in.sdlOn")
             } else {
                 mgr.stopTextInput(this)
-                com.ylmac.adapt.render.Probe.hit("in.sdlOff")
+                com.ylmac.adapt.render.profile.Probe.hit("in.sdlOff")
             }
             sdlTextOn = on
         } catch (_: Throwable) {

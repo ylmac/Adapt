@@ -1,18 +1,18 @@
 #version 330
 
-// Adapt 自有实体管线片元着色器（Complementary Reimagined r5 世界光照移植）。
-// 与地形同一套 adaptDoLighting（mainLighting.glsl 逐行移植）：
-//   albedo = tex * vertexColor.rgb（无 pow2.2，r5 gbuffers_entities 同
-//   gbuffers_terrain.glsl:219）
-//   finalDiffuse = pow2(directionShade * vanillaAO)
-//               * (blockLighting + pow2(sceneLighting) + minLighting)
-//   color.rgb *= sqrt(max(finalDiffuse, 0))   （mainLighting.glsl:611-616）
+// Adapt 自有实体管线片元着色器（ 世界光照）。
+// 与地形同一套 adaptDoLighting：
+// albedo = tex * vertexColor.rgb（无 pow2.2， 同
+
+// finalDiffuse = pow2(directionShade * vanillaAO)
+// * (blockLighting + pow2(sceneLighting) + minLighting)
+// color.rgb *= sqrt(max(finalDiffuse, 0))
 // 实体有真实 UV2（lightmap）与 alpha 通道 AO（原版实体 AO 在 alpha）：
-//   lmCoord = GetLightMapCoordinates(UV2/256)、vanillaAO = vertexColor.a。
+// lmCoord = GetLightMapCoordinates(UV2/256)、vanillaAO = vertexColor.a。
 // 阴影用 adaptShadowVisibility（与地形一致，ShadowFrame UBO 已绑定）。
-// 输出经 composite5.glsl 的 Lottes tonemap + LinearToRGB（adaptTonemapLottes）。
-// 保留 overlay/emissive 处理（overlay 混色在光照前，r5 gbuffers_terrain
-// L216 同语义）。
+// 输出经 的 Lottes tonemap + LinearToRGB（adaptTonemapLottes）。
+// 保留 overlay/emissive 处理（overlay 混色在光照前，
+// 同语义）。
 
 #moj_import <minecraft:fog.glsl>
 #moj_import <minecraft:dynamictransforms.glsl>
@@ -43,11 +43,11 @@ void main() {
     }
 #endif
 
-    // r5：albedo = tex * glColor.rgb（无 pow2.2 线性化，与地形一致）
+    // ：albedo = tex * glColor.rgb（无 pow2.2 线性化，与地形一致）
     vec3 albedo = texColor.rgb * vertexColor.rgb * ColorModulator.rgb;
     texColor.rgb = albedo;
 #ifndef NO_OVERLAY
-    // r5 gbuffers_terrain.glsl:216 同语义：overlay 混色在光照前
+    // 同语义：overlay 混色在光照前
     texColor.rgb = mix(overlayColor.rgb, texColor.rgb, overlayColor.a);
 #endif
 
@@ -59,9 +59,9 @@ void main() {
     // 阴影可见度（现有 adapt_shadow.glsl，0-1；实体同样接收太阳阴影）
     float shadowVisibility = adaptShadowVisibility(adaptWorldPos, N);
 
-    // vanillaAO = 实体顶点色 alpha（原版实体 AO 在 alpha 通道，r5 glColor.a
+    // vanillaAO = 实体顶点色 alpha（原版实体 AO 在 alpha 通道， glColor.a
     // 同语义；26.2 实体 alpha=255 通常是 1.0）
-    // entityShading=1：实体走 r5 mainLighting.glsl:144-146 的 ENTITY_SHADOW
+    // entityShading=1：实体走 的 ENTITY_SHADOW
     // 分支（lightColor 按 NdotLM 向环境色混合 → 面向太阳的面亮、背光面暗）
     adaptDoLighting(texColor, lmCoordM, N, adaptWorldPos, length(adaptFragPos),
             shadowVisibility, vertexColor.a, 0.0, 1.0);
@@ -73,7 +73,7 @@ void main() {
     float roughness = 0.8;
     texColor.rgb += adaptHaloLights(V, N, adaptFragPos, albedo, F0, roughness);
 
-    // Reimagined composite5.glsl 的 Lottes tonemap + LinearToRGB
+    // 的 Lottes tonemap + LinearToRGB
     texColor.rgb = adaptTonemapLottes(texColor.rgb);
 
     vec4 color = vec4(texColor.rgb, texColor.a);

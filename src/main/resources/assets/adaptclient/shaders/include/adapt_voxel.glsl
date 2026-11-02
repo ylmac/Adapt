@@ -1,7 +1,7 @@
 #version 330
 
 // 世界空间体素遮挡场：**只由延迟光照 pass 引入**。
-//
+
 // 为什么单独成文件而不是放进 adapt_lighting.glsl：那个 include 被 12 个 shader
 // 共享（云/天空/实体/前向地形/G-buffer 几何阶段…），而 `uniform usamplerBuffer`
 // 是独立 uniform，任何 import 它的 pipeline 都会在 SPIR-V 里声明该 uniform。
@@ -9,34 +9,34 @@
 // BindGroupLayout 里找到匹配，未匹配就抛 ShaderCompileException →
 // "Pipeline is not valid (may contain invalid shaders?)"。实测崩溃点是云 pass
 // （ReimaginedCloudRenderer.renderAfterOpaque:132），因为它的 layout 没有
-// VoxelField。UBO 字段（VoxelOrigin）不受影响 —— UBO 整块绑定，多余字段无害。
-//
+// VoxelField。UBO 字段（VoxelOrigin）不受影响 — UBO 整块绑定，多余字段无害。
+
 // 依赖 adapt_lighting.glsl 提供的 AdaptLighting UBO（VoxelOrigin / HaloLight* /
 // ViewRotCol*）与 adaptLightingGGX2 / HALO_RADIANCE_GAIN，所以必须在它之后引入。
 
 // ---- 方块光源阴影：世界空间体素遮挡场（延迟渲染专属）----
-//
+
 // 为什么不是屏幕空间步进（SSRT）。上一版用屏幕空间光线步进，用户实测三个
 // 必然缺陷：影子随走动/视角转动而变（屏幕空间方法的固有性质，不是 bug）、
 // 出现"两层"（屏幕外遮挡物缺失 + 深度重投影歧义）、每帧全量重算无法缓存。
 // 世界空间体素场三条全部解决：视角无关、遮挡物不受屏幕可见性限制、数据按
 // 区块增量更新可跨帧复用。
-//
+
 // 为什么不是 cube shadow map：32 光源 × 6 面 = 192 次地形重绘，M4 上不可行。
-//
+
 // 为什么载体是 texel buffer 而不是 sampler3D：MC 26.2 的 Blaze3D 完全不支持
 // 3D 纹理（IntermediaryShaderModule.rebind off.434 拒绝 SPIR-V Dim3D；
 // GpuDevice.verifyTextureCreationArgs off.159 拒绝 depthOrLayers>1；
 // VulkanGpuTexture.<init> off.48 把 imageType 写死 VK_IMAGE_TYPE_2D）。
 // texel buffer + texelFetch + 手工索引展平是被原版验证过的路径（CloudFaces）。
-//
+
 // 体素编码（每体素 2 个 RGBA32_UINT texel = 32 字节，见 VoxelOcclusionField.pack）：
-//   word[i] 位 0-29 : minX(5) minY(5) minZ(5) maxX(5) maxY(5) maxZ(5)，单位 1/16 格
-//   word[0] 位 30   : 材质半透明（玻璃/树叶/水）
-//   word[i] 位 31   : 该槽位有效
+// word[i] 位 0-29: minX(5) minY(5) minZ(5) maxX(5) maxY(5) maxZ(5)，单位 1/16 格
+// word[0] 位 30: 材质半透明（玻璃/树叶/水）
+// word[i] 位 31: 该槽位有效
 // 八个槽位：MC 栅栏四向全连是 1 柱 + 8 条横杆（每侧上下两根）共 9 个 box，
-// 4 个槽位装不下，toAabbs() 返回的最大 box 往往是跨整格的横杆，栅栏就又变成
-// 整格实心（实测"栅栏还是不透光"）。网格同时从 ±64 缩到 ±32 格 —— 点光半径
+// 4 个槽位装不下，toAabbs 返回的最大 box 往往是跨整格的横杆，栅栏就又变成
+// 整格实心（实测"栅栏还是不透光"）。网格同时从 ±64 缩到 ±32 格 — 点光半径
 // 只有 5.5–7 格，覆盖远超需要，省下的预算换槽位，内存反而从 32 MiB 降到 8 MiB。
 uniform usamplerBuffer VoxelField;
 
@@ -76,7 +76,7 @@ int adaptVoxelIndex(ivec3 v, int size) {
  * <p>
  * voxelStart/voxelEnd 已是**体素空间坐标**（调用方用 worldRelPos - VoxelOrigin.xyz
  * 换算好；VoxelOrigin 存的是相对相机的原点，见
- * 加回相机位置才能落到网格索引 —— 这里用的是 adaptWorldPos 的定义域，光源
+ * 加回相机位置才能落到网格索引 — 这里用的是 adaptWorldPos 的定义域，光源
  * 位置同样来自视空间，两者都需要换算，因此改为直接传入体素空间坐标。
  * <p>
  * 采用标准 3D DDA（Amanatides & Woo）：沿射线逐体素推进，每步只做一次
@@ -87,7 +87,7 @@ int adaptVoxelIndex(ivec3 v, int size) {
  * <p>
  * skipVoxel 是<b>要跳过相交测试的那一格</b>（片元自己所在的体素）。
  * 之前的做法是把起点沿法线推出 0.55 格来"躲开自己"，那是错的：地面像素的
- * 射线起点因此落在 y=0.55，而栅栏横杆的局部高度是 y=0.375..0.9375 —— 射线
+ * 射线起点因此落在 y=0.55，而栅栏横杆的局部高度是 y=0.375..0.9375 — 射线
  * 整条都在横杆高度带里穿行，被判遮挡（实测"栅栏围一圈里面没光"，而孤立
  * 栅栏只有柱子没有横杆所以正常）。正确做法是起点贴着表面、只跳过自己那一格。
  */
@@ -127,14 +127,14 @@ float adaptVoxelOcclusion(vec3 voxelStart, vec3 voxelEnd, ivec3 skipVoxel, int s
     vec3 signedInvDir = 1.0 / mix(dir, vec3(1e-6), lessThan(abs(dir), vec3(1e-6)));
 
     // 步数上限：3D DDA 走完长度 L 的射线需要的步数**不是 L，而是最多 L·√3**
-    // —— 每跨一个 x/y/z 边界算一步，对角线方向三个轴都在跨。旧代码写的是
+    // — 每跨一个 x/y/z 边界算一步，对角线方向三个轴都在跨。旧代码写的是
     // int(min(total, size*1.732)) + 1 ≈ total + 1，对斜射线只给了约 1/1.73
     // 的步数 → 射线在撞到遮挡物之前就提前退出 → 判成"无遮挡"。漏的程度随
     // 方向变化（轴向够、对角线不够），正是"计算不太准确、有很多错误"的形态。
     // +2 覆盖起点所在的半个体素与零轴的取整余量。
     int maxSteps = int(total * 1.7321) + 2;
     // 防御性硬上限 + 距离分档预算（调用方按视距给，见 adaptVoxelStepBudget）。
-    // 远处的局部光阴影细节在屏幕上只有几个像素，付全价是浪费 —— AC Shadows
+    // 远处的局部光阴影细节在屏幕上只有几个像素，付全价是浪费 — AC Shadows
     // 的 1/4 分辨率 1 ray/pixel 是同一个取舍（他们试过全分辨率，结论是
     // "质量提升不值 4 倍成本"）。步数被截断时射线提前结束、返回当前
     // transmittance，即按"剩下的路无遮挡"处理：宁可漏遮挡不要假遮挡。
@@ -144,7 +144,7 @@ float adaptVoxelOcclusion(vec3 voxelStart, vec3 voxelEnd, ivec3 skipVoxel, int s
     float tCurrent = 0.0;
 
     for (int i = 0; i < maxSteps; ++i) {
-        // 越界即视为无遮挡（宁可漏遮挡也不要假遮挡 —— 假遮挡会在世界里
+        // 越界即视为无遮挡（宁可漏遮挡也不要假遮挡 — 假遮挡会在世界里
         // 出现莫名黑块，比缺一点阴影糟糕得多）
         if (any(lessThan(voxel, ivec3(0))) || any(greaterThanEqual(voxel, ivec3(size)))) {
             return transmittance;
@@ -242,15 +242,15 @@ float adaptVoxelOcclusion(vec3 voxelStart, vec3 voxelEnd, ivec3 skipVoxel, int s
  * <p>
  * worldRelPos 是世界相对位置（G-buffer GB4，即 regionPos - camPos），
  * VoxelOrigin.xyz 也是相对相机的网格原点，所以 worldRelPos - VoxelOrigin.xyz
- * 直接就是体素空间坐标 —— 全程不需要相机绝对坐标，也避免了远离世界原点时
+ * 直接就是体素空间坐标 — 全程不需要相机绝对坐标，也避免了远离世界原点时
  * 的 float 精度损失。
  */
 // 增长式光源列表（texel buffer）。旧实现用 UBO 里的 vec4 HaloLightPos[32]，
 // 定长数组 = 硬上限 32，实测表现为"显示范围内有些光没法显示"。texel buffer
 // 的元素数 Blaze3D 完全不校验（maxTexelBufferElements 全 jar 0 命中），
 // 容量由 LightListBuffer 按需翻倍。布局：每光源 2 条 RGBA32_FLOAT texel，
-//   texel 2i   = xyz 视空间位置 / w 半径
-//   texel 2i+1 = rgb 颜色 / a 强度
+// texel 2i = xyz 视空间位置 / w 半径
+// texel 2i+1 = rgb 颜色 / a 强度
 uniform samplerBuffer LightList;
 uniform usamplerBuffer LightTiles;
 
@@ -266,11 +266,11 @@ uniform usamplerBuffer LightTiles;
  * <p>
  * 现在深度分簇（LightTileGrid 加了 48 个深度切片）把候选灯从 87–194 降到
  * 个位数，逐灯阴影变得可负担：每盏灯的颜色乘它<b>自己</b>的可见性，
- * 栅栏内外互不干扰，而且完全确定性 —— 没有随机采样，就没有噪点、
+ * 栅栏内外互不干扰，而且完全确定性 — 没有随机采样，就没有噪点、
  * 没有多重影子拷贝、不依赖降噪收敛。
  * <p>
  * 16 是防御上限（真实值是个位数）。超出的灯仍然贡献光照，只是不付阴影
- * 代价（按无遮挡处理）—— 宁可漏遮挡也不要丢灯。
+ * 代价（按无遮挡处理）— 宁可漏遮挡也不要丢灯。
  */
 #define ADAPT_MAX_SHADOW_LIGHTS 16
 
@@ -279,7 +279,7 @@ uniform usamplerBuffer LightTiles;
  * <p>
  * 近处（≤SampleParams.z 格）给满 128 步；远处（≥SampleParams.w 格）返回 0
  * 直接不追；中间线性压缩到 12 步。这是你提的"远处降采样、近处恢复"，
- * 也是 AC Shadows / Lumen 档位设计的同一思路 —— 每档约为上一档一半成本。
+ * 也是 AC Shadows / Lumen 档位设计的同一思路 — 每档约为上一档一半成本。
  * <p>
  * 分档只影响<b>阴影</b>，不影响光照本身：远处的灯照样照亮，只是不投影。
  * 视觉上远处的点光阴影本来就只有几个像素宽，看不出来。
@@ -354,7 +354,7 @@ bool adaptVoxelDebug(vec3 worldRelPos, out vec3 debugColor) {
  * <p>
  * 候选灯来自 LightTileGrid 的深度分簇（16×16 屏幕格 × 48 个 8 格深度切片，
  * CSR 布局）。加深度这一维之前，一个屏幕格是一条从相机延伸到渲染边界的长
- * 棱锥，深度方向完全不过滤 —— 实测 tileAvg=87 tileMax=194，而点光半径只有
+ * 棱锥，深度方向完全不过滤 — 实测 tileAvg=87 tileMax=194，而点光半径只有
  * 5.5–7 格，真正能照到某像素的灯只有个位数，90% 以上的候选是白算的。
  * <p>
  * 候选数降到个位数后，可以给<b>每盏灯各发一条阴影射线</b>，不再需要随机
@@ -381,7 +381,7 @@ vec3 adaptHaloLightsOccluded(vec3 V, vec3 N, vec3 fragPos, vec3 worldRelPos,
         int slice = clamp(int(floor(-fragPos.z / sliceThickness)), 0, slices - 1);
         int cluster = (slice * grid + ty) * grid + tx;
         // CSR：行指针相邻两项之差就是这一簇的灯数，容量按需分配，
-        // 结构上不可能丢灯 —— 不再需要溢出哨兵。
+        // 结构上不可能丢灯 — 不再需要溢出哨兵。
         int rowStart = int(texelFetch(LightTiles, cluster).r);
         int rowEnd = int(texelFetch(LightTiles, cluster + 1).r);
         count = rowEnd - rowStart;
@@ -399,17 +399,17 @@ vec3 adaptHaloLightsOccluded(vec3 V, vec3 N, vec3 fragPos, vec3 worldRelPos,
     vec3 fragVoxel = worldRelPos - VoxelOrigin.xyz;
     // 世界空间的法线（视图→世界用 ViewRotCol 三列，见 adapt_lighting.glsl 顶部）
     vec3 worldN = ViewRotCol0.xyz * N.x + ViewRotCol1.xyz * N.y + ViewRotCol2.xyz * N.z;
-    // 起点只推出 1/64 格 —— 只为躲开浮点误差导致的 floor() 归属摇摆，
+    // 起点只推出 1/64 格 — 只为躲开浮点误差导致的 floor 归属摇摆，
     // **不是**为了躲开自己所在的实心体素（那个由 skipVoxel 精确处理）。
-    //
+    
     // 旧值 0.55 是错的：地面像素的射线起点因此落在 y=0.55，而栅栏横杆的
-    // 局部高度带是 y=0.375..0.9375 —— 射线整条在横杆里穿行，被判遮挡。
+    // 局部高度带是 y=0.375..0.9375 — 射线整条在横杆里穿行，被判遮挡。
     // 实测"栅栏围一圈里面没光"，且孤立栅栏（只有柱子、没有横杆）正常。
     vec3 startVoxel = fragVoxel + worldN * 0.015625;
     // 片元"自己"那一格：必须从**沿法线往里推**的点算，不能直接 floor(fragVoxel)。
-    //
+    
     // 表面通常正好落在体素边界上：地面方块占世界 y=-1，它的顶面在 y=0.0，
-    // floor(0.0)=0 —— 那是<b>上方</b>那一格。若上方那格是栅栏，skipVoxel 就
+    // floor(0.0)=0 — 那是<b>上方</b>那一格。若上方那格是栅栏，skipVoxel 就
     // 指向栅栏，于是栅栏被跳过，紧贴栅栏的地面没有影子（实测"靠近栅栏的地方
     // 有时影子不会显示"）。往里推 1/64 后 floor(-0.0156) = -1，正确指向地面
     // 自己那一格。
@@ -428,7 +428,7 @@ vec3 adaptHaloLightsOccluded(vec3 V, vec3 N, vec3 fragPos, vec3 worldRelPos,
         vec3 delta = lightPos.xyz - fragPos;
         float dist = length(delta);
         float radius = lightPos.w;
-        // 簇是保守包围盒，落在簇里不等于落在半径内 —— 这里才是精确判据。
+        // 簇是保守包围盒，落在簇里不等于落在半径内 — 这里才是精确判据。
         if (dist >= radius || dist < 0.0001) {
             continue;
         }
@@ -443,7 +443,7 @@ vec3 adaptHaloLightsOccluded(vec3 V, vec3 N, vec3 fragPos, vec3 worldRelPos,
         float atten = clamp(1.0 - dist / radius, 0.0, 1.0);
         atten = atten * atten * (3.0 - 2.0 * atten);
 
-        // 这盏灯**自己**的可见性。预算用尽后按无遮挡处理 —— 宁可漏遮挡
+        // 这盏灯**自己**的可见性。预算用尽后按无遮挡处理 — 宁可漏遮挡
         // 也不要丢灯（真实候选数是个位数，预算 16 基本用不满）。
         float visibility = 1.0;
         if (shadowBudget > 0 && stepBudget > 0) {

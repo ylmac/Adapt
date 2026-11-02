@@ -65,7 +65,7 @@ import com.ylmac.adapt.compose.ui.Md3Switch
 import com.ylmac.adapt.compose.ui.retainedLayer
 import com.ylmac.adapt.compose.ui.Md3TextField
 import com.ylmac.adapt.compose.ui.NavItem
-import com.ylmac.adapt.render.AdaptRuntime
+import com.ylmac.adapt.render.screen.AdaptRuntime
 import com.ylmac.adapt.render.clickgui.ClickGuiBridge
 import kotlinx.coroutines.launch
 import kotlin.math.floor
@@ -181,7 +181,7 @@ fun ClickGuiContent(refreshToken: Int = 0) {
                 Spacer(Modifier.width(8.dp))
 
                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                    // Content panel — hidden while settings open (QML visible:!settingsOpen)
+                    // Content panel — hidden while settings open (visible:!settingsOpen)
                     if (!settingsOpen) {
                         Box(
                             Modifier

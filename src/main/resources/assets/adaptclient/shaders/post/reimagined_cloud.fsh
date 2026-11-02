@@ -1,6 +1,6 @@
 #version 330
 
-// Native Vulkan port of Complementary Reimagined r5 CLOUDS_REIMAGINED.
+// Native Vulkan port of CLOUDS_REIMAGINED.
 // Runs after opaque geometry and before translucent terrain/water. The cloud density
 // is the original repeat+linear cloud-water.png blue channel, not generated noise.
 
@@ -39,7 +39,7 @@ float smoothstep1(float value) {
     return value * value * (3.0 - 2.0 * value);
 }
 
-// Complementary cloudCoord.glsl, preserving its rounded-cell density coordinates.
+// , preserving its rounded-cell density coordinates.
 vec2 roundedCloudCoord(vec2 position, float roundness) {
     vec2 coord = position.yx + 0.5;
     vec2 coordSign = sign(coord);
@@ -77,7 +77,7 @@ float interleavedGradientNoise() {
 
 void main() {
     // Native reversed-Z: cleared sky pixels are zero. Opaque terrain/entities must
-    // remain in front of clouds, exactly as Reimagined's depthtex0/skyFade branch.
+    // remain in front of clouds, exactly as 's depthtex0/skyFade branch.
     float opaqueDepth = texture(OpaqueDepthSampler, texCoord).r;
     if (opaqueDepth > 0.00001) {
         discard;
@@ -107,7 +107,7 @@ void main() {
     }
 
     float segmentLength = maxDistance - minDistance;
-    // Reimagined CLOUD_QUALITY=2: max(int(length)/8, 12). Keep a bounded native
+    // CLOUD_QUALITY=2: max(int(length)/8, 12). Keep a bounded native
     // iteration count for Vulkan/MoltenVK while preserving 8-block sampling nearby.
     int sampleCount = min(max(int(segmentLength) / 8, 12), 128);
     float stepLength = segmentLength / float(sampleCount);

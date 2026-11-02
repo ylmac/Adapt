@@ -30,12 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3LoadingIndicator
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 import kotlinx.coroutines.delay
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/** LoginDialog.qml — QR matrix from player.qrImage, poll every 800ms. */
+/** — QR matrix from player.qrImage, poll every 800ms. */
 @Composable
 fun LoginDialog(
     active: Boolean,

@@ -40,7 +40,7 @@ import com.ylmac.adapt.compose.theme.MonetScheme
 
 data class NavItem(val icon: String, val label: String)
 
-/** MD3 NavigationRail — 对齐 qml-retired NavigationRail.qml（80 / 64×48 / bounce 1.14）。 */
+/** MD3 NavigationRail：宽 80，胶囊 64×48，按下放大 1.14。 */
 @Composable
 fun Md3NavigationRail(
     items: List<NavItem>,
@@ -139,7 +139,7 @@ private fun ColumnScope.RailSlot(
     }
 }
 
-/** BottomNav — 对齐 qml-retired BottomNav / NavigationBar：76 高，pill 64×32 secondaryContainer。 */
+/** 底部导航：高 76，pill 64×32。 */
 @Composable
 fun Md3BottomNav(
     items: List<NavItem>,

@@ -1,14 +1,14 @@
 #version 330 core
 
-// G-buffer 可视化调试 pass —— 直接输出 G-buffer 内容，跳过光照。
+// G-buffer 可视化调试 pass — 直接输出 G-buffer 内容，跳过光照。
 // 用途：区分"G-buffer 没写入"（全黑/全零）与"光照算出来是黑"（G-buffer 有内容但 lit=0）。
 // 显示模式由 Java 侧 DebugConfig UBO 控制：
-//   1 = albedo（GB2.rgb）
-//   2 = 法线（GB1.rgb * 0.5 + 0.5）
-//   3 = 视空间位置（GB0.rgb * 0.05 缩放可视化）
-//   4 = coverage（GB0.w，白色=几何）
-//   5 = 世界相对位置（GB4.rgb，按 0.02 缩放）
-//   6 = lmCoordM（GB5.xy：R=blockLight G=skyLight）
+// 1 = albedo（GB2.rgb）
+// 2 = 法线（GB1.rgb * 0.5 + 0.5）
+// 3 = 视空间位置（GB0.rgb * 0.05 缩放可视化）
+// 4 = coverage（GB0.w，白色=几何）
+// 5 = 世界相对位置（GB4.rgb，按 0.02 缩放）
+// 6 = lmCoordM（GB5.xy：R=blockLight G=skyLight）
 
 uniform sampler2D GB0Sampler;
 uniform sampler2D GB1Sampler;

@@ -1,26 +1,26 @@
 package com.ylmac.adapt.render.clickgui;
 
 import com.ylmac.adapt.AdaptClient;
-import com.ylmac.adapt.features.module.Category;
-import com.ylmac.adapt.features.module.Module;
-import com.ylmac.adapt.features.module.ModuleDescriptions;
-import com.ylmac.adapt.features.module.ModuleManager;
-import com.ylmac.adapt.features.module.impl.render.gui.RiseConfigs;
-import com.ylmac.adapt.features.module.impl.render.gui.RiseLang;
-import com.ylmac.adapt.features.module.impl.render.gui.RiseTheme;
-import com.ylmac.adapt.features.module.settings.Setting;
-import com.ylmac.adapt.features.module.settings.impl.BoolSetting;
-import com.ylmac.adapt.features.module.settings.impl.ButtonSetting;
-import com.ylmac.adapt.features.module.settings.impl.ChoiceSetting;
-import com.ylmac.adapt.features.module.settings.impl.ColorSetting;
-import com.ylmac.adapt.features.module.settings.impl.DoubleSetting;
-import com.ylmac.adapt.features.module.settings.impl.EnumSetting;
-import com.ylmac.adapt.features.module.settings.impl.IntSetting;
-import com.ylmac.adapt.features.module.settings.impl.StringSetting;
-import com.ylmac.adapt.render.GpuContextHelper;
-import com.ylmac.adapt.render.MinecraftSurfaceBackend;
-import com.ylmac.adapt.render.RiseFont;
-import com.ylmac.adapt.render.SkijaNativeFix;
+import com.ylmac.adapt.module.Category;
+import com.ylmac.adapt.module.Module;
+import com.ylmac.adapt.module.ModuleDescriptions;
+import com.ylmac.adapt.module.ModuleManager;
+import com.ylmac.adapt.module.render.gui.RiseConfigs;
+import com.ylmac.adapt.module.render.gui.RiseLang;
+import com.ylmac.adapt.module.render.gui.RiseTheme;
+import com.ylmac.adapt.module.settings.Setting;
+import com.ylmac.adapt.module.settings.impl.BoolSetting;
+import com.ylmac.adapt.module.settings.impl.ButtonSetting;
+import com.ylmac.adapt.module.settings.impl.ChoiceSetting;
+import com.ylmac.adapt.module.settings.impl.ColorSetting;
+import com.ylmac.adapt.module.settings.impl.DoubleSetting;
+import com.ylmac.adapt.module.settings.impl.EnumSetting;
+import com.ylmac.adapt.module.settings.impl.IntSetting;
+import com.ylmac.adapt.module.settings.impl.StringSetting;
+import com.ylmac.adapt.render.surface.GpuContextHelper;
+import com.ylmac.adapt.render.surface.MinecraftSurfaceBackend;
+import com.ylmac.adapt.render.font.RiseFont;
+import com.ylmac.adapt.render.surface.SkijaNativeFix;
 import io.github.humbleui.skija.BlendMode;
 import io.github.humbleui.skija.Canvas;
 import io.github.humbleui.skija.ClipMode;
@@ -44,7 +44,7 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.ylmac.adapt.input.GLFW;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -56,23 +56,21 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Rise 6.9.5 ClickGUI —— <b>逐像素一致</b>移植（MC 26.2 / Fabric / Skija）。
  * <p>
- * 来源：{@code com.alan.clients.ui.click.standard.RiseClickGUI} + components/ModuleComponent +
- * UIColors + util/render/RenderUtil。所有数值照抄原版：
+ * 窗口几何：
  * <ul>
- *   <li>窗口 400×300 / r=12 / BACKGROUND(23,26,33,254)，dropShadow(18 层同心圆角矩形,
- *       外扩 30.0, 圆角 ×1.3 = 15.6)；</li>
- *   <li>侧栏 100px SECONDARY(18,20,25) + 右侧 30px 黑色渐隐(≤36)；品牌 32pt + 版本 16pt accent；</li>
- *   <li>分类：起始 y=45.5、行距 19.5、药丸 r=5 <b>accent.darker()</b>、图标 17pt、文字 16pt；</li>
- *   <li>模块行 283×38 r=6 OVERLAY(0,0,0,50)；悬停黑 20 / 按住黑 35（LINEAR 50ms）；
- *       名字 20pt（启用 = accent）、描述 15pt alpha70；<b>左键开关 / 右键展开</b>；</li>
- *   <li>展开高度 = 38 + Σ可见设置高 − 1，EASE_OUT_EXPO（时长 min(3ms×高, 450ms)），内容线性淡入；</li>
- *   <li>强调色 = Blend 主题正弦流动 sin(t/600 + x*0.005 + y*0.06)，位置参数传 y/5；</li>
- *   <li>滚动：滚轮/2（=60px/格）、clamp(min,0)、每 ms 1% 逼近；右缘 1px 滚动条(白 alpha60)；</li>
- *   <li>切页：旧页保持 200ms → 黑幕 200ms 淡出（总 400ms）；</li>
- *   <li>Shaders 开启时跑 BLOOM 通道（radius 14 / compression 2，离屏模糊后加法合成），
- *       发光图元 = 窗口矩形 + 侧栏 + 侧栏右缘 9 个同心圆(直径 0..400 步进 50) + 选中分类药丸。</li>
+ * <li>窗口 400×300 / r=12 / BACKGROUND(23,26,33,254)，dropShadow(18 层同心圆角矩形,
+ * 外扩 30.0, 圆角 ×1.3 = 15.6)；</li>
+ * <li>侧栏 100px SECONDARY(18,20,25) + 右侧 30px 黑色渐隐(≤36)；品牌 32pt + 版本 16pt accent；</li>
+ * <li>分类：起始 y=45.5、行距 19.5、药丸 r=5 <b>accent.darker</b>、图标 17pt、文字 16pt；</li>
+ * <li>模块行 283×38 r=6 OVERLAY(0,0,0,50)；悬停黑 20 / 按住黑 35（LINEAR 50ms）；
+ * 名字 20pt（启用 = accent）、描述 15pt alpha70；<b>左键开关 / 右键展开</b>；</li>
+ * <li>展开高度 = 38 + Σ可见设置高 − 1，EASE_OUT_EXPO（时长 min(3ms×高, 450ms)），内容线性淡入；</li>
+ * <li>强调色 = Blend 主题正弦流动 sin(t/600 + x*0.005 + y*0.06)，位置参数传 y/5；</li>
+ * <li>滚动：滚轮/2（=60px/格）、clamp(min,0)、每 ms 1% 逼近；右缘 1px 滚动条(白 alpha60)；</li>
+ * <li>切页：旧页保持 200ms → 黑幕 200ms 淡出（总 400ms）；</li>
+ * <li>Shaders 开启时跑 BLOOM 通道（radius 14 / compression 2，离屏模糊后加法合成），
+ * 发光图元 = 窗口矩形 + 侧栏 + 侧栏右缘 9 个同心圆(直径 0..400 步进 50) + 选中分类药丸。</li>
  * </ul>
  * 控件：Boolean 生长圆点（100ms 0→5）、Number 100px 轨道+5×5 手柄+数值框（可拖可输入）、
  * Bounds 双手柄、Mode/List 左键下一个/右键上一个、String 28 高文本框、Color 15/110 折叠
@@ -81,17 +79,16 @@ import java.util.Set;
  */
 public class RiseClickGuiScreen extends Screen {
 
-    // ─────────────── 布局常量（Rise 原值） ───────────────
+ // ─────────────── 布局常量 ───────────────
     private static final float W = 400f, H = 300f, ROUND = 12f;
     private static final float SIDEBAR_W = 100f;
     private static final float ROW_W = 283f, ROW_H = 38f, ROW_GAP = 7f, ROW_R = 6f;
     private static final float CAT_Y0 = 45.5f, CAT_STEP = 19.5f, CAT_X = 10f;
     private static final float SCROLL_TRACK_H = H - 14f;
     private static final float SHADOW_EXPAND = 30f, SHADOW_CORNER = ROUND * 1.3f;
-    /** dropShadow(18, …) —— Rise 窗口调用的层数 */
     private static final int SHADOW_ITERS = 18;
 
-    // ─────────────── 颜色（UIColors / Themes） ───────────────
+    // ─────────────── 颜色（/ Themes） ───────────────
     private static final int C_BACKGROUND = 0xFE171A21;   // (23,26,33,254)
     private static final int C_SECONDARY = 0xFF121419;    // (18,20,25,255)
     private static final int C_OVERLAY = 0x32000000;      // 黑 alpha 50
@@ -101,7 +98,7 @@ public class RiseClickGuiScreen extends Screen {
     private static final int ACCENT_A = 0xFF4794FD;       // Themes.BLEND 主色 1
     private static final int ACCENT_B = 0xFF47FDA0;       // Themes.BLEND 主色 2
 
-    // ─────────────── 字体（Rise 点值 → RiseFont 内部 ÷2 渲染） ───────────────
+ // ─────────────── 字体 ───────────────
     private final RiseFont f32 = RiseFont.main(32, RiseFont.Weight.REGULAR);
     private final RiseFont f20 = RiseFont.main(20, RiseFont.Weight.REGULAR);
     private final RiseFont f17 = RiseFont.main(17, RiseFont.Weight.REGULAR);
@@ -109,14 +106,11 @@ public class RiseClickGuiScreen extends Screen {
     private final RiseFont f16 = RiseFont.main(16, RiseFont.Weight.REGULAR);
     private final RiseFont f15 = RiseFont.main(15, RiseFont.Weight.REGULAR);
     private final RiseFont f13 = RiseFont.main(13, RiseFont.Weight.REGULAR);
-    /** Rise 品牌基线用 42pt 字高（SidebarCategory 原式，与 32pt 名字字高不同） */
     private final RiseFont f42 = RiseFont.main(42, RiseFont.Weight.REGULAR);
-    /** Rise 图标字体（拷贝自 Rise 资源 assets/minecraft/rise/font/Icon-*.ttf） */
     private final RiseFont icons1 = RiseFont.get("Icon-1.ttf", 17);
-    /** ⚠ Rise FontManager：ICONS_1 = Icon-1.ttf，ICONS_2 = **Icon-3.ttf**（不是 Icon-2）——
-     *  之前加载 Icon-2 → 搜索/主题/语言/脚本 四个图标全空白（离线渲染验证：Icon-2 只有个别字形） */
+    /** Icon-2 字形不全，搜索/主题/语言/脚本 用 Icon-3。 */
     private final RiseFont icons2 = RiseFont.get("Icon-3.ttf", 17);
-    /** 页面图标字形（Rise Category 枚举原值；SEARCH/THEME/LANGUAGE/SCRIPT 用 ICONS_2） */
+ /** 页面图标字形 */
     private static final String[] CAT_GLYPHS = {"U", "a", "b", "c", "g", "f", "m", "U", "U"};
     private static final boolean[] CAT_ICON2 = {true, false, false, false, false, false, true, true, true};
 
@@ -134,7 +128,6 @@ public class RiseClickGuiScreen extends Screen {
 
     /** 设计单位 → 屏幕单位 的等比缩放（保证 400×300 窗口 + 边距始终放得下） */
     private float uiScale = 1f;
-    /** 诊断转储开关（-Dadapt.riseGuiDump=true 或 system property 关闭时静默） */
     private static final boolean GUI_DUMP = Boolean.getBoolean("adapt.riseGuiDump");
     private int guiFrame;
     private int guiDumpCount;
@@ -145,7 +138,7 @@ public class RiseClickGuiScreen extends Screen {
     private boolean pendingClose;
     private long lastFrameNs;
 
-    /** 页面：0 = 搜索，1..n = 分类（顺序对齐 Rise：战斗/移动/玩家/渲染/设置） */
+ /** 页面：0 = 搜索，1..n = 分类 */
     private int page;
     private int prevPage;
     private long pageSwitchNs;
@@ -153,16 +146,15 @@ public class RiseClickGuiScreen extends Screen {
 
     private float scroll, scrollTarget;
     private float scrollMin;
-    /** 9 个页面各自记住 (scroll, target, min) —— Rise 每个 Screen 一个 ScrollUtil */
     private final float[][] pageScroll = new float[9][3];
-    /** 侧栏不透明度（Rise axT：每 ms +2 / −1.5） */
+ /** 侧栏不透明度 */
     private float sidebarAlpha = 255f;
-    /** 侧栏滑出/收回（Rise SidebarCategory.animation：0 .. −66.67） */
+ /** 侧栏滑出/收回 */
     private final Anim sidebarAnim = new Anim(2000f, Ease.EASE_OUT_EXPO);
-    /** 侧栏是否展开（Rise ayo：注意语义是"显示"） */
+ /** 侧栏是否展开 */
     private boolean sidebarShown = true;
     /** 鼠标连续离开窗口的时长（滞回，防止单帧误判导致侧栏抖动） */
-    private float outsideMs;   // Rise axT：非主题页恒 255
+    private float outsideMs;
 
     private final List<Category> cats = orderCategories();
 
@@ -170,7 +162,7 @@ public class RiseClickGuiScreen extends Screen {
         final Anim hover = new Anim(50f, Ease.LINEAR);
         final Anim press = new Anim(50f, Ease.LINEAR);
         final Anim expand = new Anim(450f, Ease.EASE_OUT_EXPO);
-        /** 展开内容透明度（Rise ayf：LINEAR，时长 = 展开时长/2、收起 /3，目标 255/0） */
+ /** 展开内容透明度 */
         final Anim content = new Anim(150f, Ease.LINEAR);
         float expandValue;
     }
@@ -179,20 +171,19 @@ public class RiseClickGuiScreen extends Screen {
     private final Map<Module, Boolean> expanded = new HashMap<>();
     private final Map<Setting<?>, Float> boolAnim = new HashMap<>();
     private final Map<Setting<?>, Float> trackAnim = new HashMap<>();
-    /** 分类选中动画（Rise CategoryComponent：LINEAR 200ms，0..255） */
+ /** 分类选中动画 */
     private final float[] catSelAnim = new float[16];
-    /** 取色器 SV 光标位置（Rise azc：相对面板左上角的像素偏移） */
+ /** 取色器 SV 光标位置 */
     private final Map<ColorSetting, float[]> colorCursor = new HashMap<>();
-    /** Rise 取色器色相位置（ayZ：0..88px） */
     private final Map<ColorSetting, Float> colorHue = new HashMap<>();
-    /** 搜索框 CENTER 对齐的平滑位置（Rise TextBox.posX） */
+ /** 搜索框 CENTER 对齐的平滑位置 */
     private float searchPosX = Float.NaN;
-    /** 首次输入清空搜索框（Rise typedWhileOpen） */
+ /** 首次输入清空搜索框 */
     private boolean searchTyped;
     /** 数值/字符串编辑框的光标动画基准 */
     private long editStartNs = System.nanoTime();
 
-    /** 拖动会话（Rise: Number/Bounds 手柄拖动） */
+ /** 拖动会话 */
     private Setting<?> dragSetting;
     private float dragTrackX;
     private boolean dragMax;         // Bounds 的第二个手柄
@@ -209,12 +200,12 @@ public class RiseClickGuiScreen extends Screen {
     private final List<Object[]> valueHits = new ArrayList<>();    // {Setting,x,y,w,h}
     private final List<Object[]> catHits = new ArrayList<>();      // {pageIndex,x,y,w,h}
     private final List<Object[]> copyHits = new ArrayList<>();     // {ColorSetting, x, y, w, h, kind}
-    private final List<Object[]> themeHits = new ArrayList<>();    // {RiseTheme|x,y,w,h} / 选中标记用 5 元素
-    private final List<Object[]> langHits = new ArrayList<>();     // {RiseLang.Lang,x,y,w,h}
-    private final List<Object[]> scriptHits = new ArrayList<>();   // {RiseConfigs.Card,x,y,w,h,index}
+    private final List<Object[]> themeHits = new ArrayList<>();
+    private final List<Object[]> langHits = new ArrayList<>();
+    private final List<Object[]> scriptHits = new ArrayList<>();
     /** 主题页当前 keycolor 过滤（null = 全部） */
     private RiseTheme.KeyColor themeFilter;
-    /** 主题卡片 x/y 滑入动画（Rise ThemeComponent.getXAnimation/getYAnimation） */
+ /** 主题卡片 x/y 滑入动画 */
     private final Map<RiseTheme, float[]> themeCardAnim = new HashMap<>();
     private float dtTheme = 16f;
 
@@ -228,7 +219,6 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     private static List<Category> orderCategories() {
-        // Rise 侧栏顺序：COMBAT, MOVEMENT, PLAYER, RENDER, …（我们只有 5 类）
         List<Category> list = new ArrayList<>();
         list.add(Category.COMBAT);
         list.add(Category.MOVEMENT);
@@ -250,7 +240,7 @@ public class RiseClickGuiScreen extends Screen {
 
     @Override
     public void extractBackground(GuiGraphicsExtractor g, int mx, int my, float a) {
-        // 无背景：世界透出（Rise 同款）
+ // 无背景：世界透出
     }
 
     // ───────────────────────── 渲染入口 ─────────────────────────
@@ -260,13 +250,12 @@ public class RiseClickGuiScreen extends Screen {
         Minecraft mc = Minecraft.getInstance();
         int guiW = mc.getWindow().getGuiScaledWidth();
         int guiH = mc.getWindow().getGuiScaledHeight();
-        // 等比缩放：设计 400×300 在窗口里放不下时缩小（Rise 原版会溢出屏幕 → 表现为"重叠/被裁"）
+ // 等比缩放：设计 400×300 在窗口里放不下时缩小
         uiScale = Math.min(1f, Math.min((guiW - 24f) / W, (guiH - 24f) / H));
         if (uiScale < 0.35f) uiScale = 0.35f;
         float designW = guiW / uiScale, designH = guiH / uiScale;
         if (!posSet) {
             for (float[] sc : pageScroll) sc[2] = -1f;   // min 未计算标记
-            // Rise initGui：首次居中（初值 416×338 只用于居中），越界时重新居中
             wx = Math.round((designW - 416f) / 2f);
             wy = Math.round((designH - 338f) / 2f);
             posSet = true;
@@ -302,7 +291,6 @@ public class RiseClickGuiScreen extends Screen {
                 closing = false;
                 this.onClose();
             }
-            // 诊断：打开界面后按帧转储（最多 12 张，间隔 20 帧）→ ~/.adapt-rise-gui/
             // 用于离线比对本界面每一帧的布局（不需要第二次进游戏就能核对）
             if (GUI_DUMP && guiDumpCount < 12 && (guiFrame++ % 20) == 0) {
                 dumpFrame();
@@ -312,7 +300,7 @@ public class RiseClickGuiScreen extends Screen {
         }
     }
 
-    /** 打开/关闭动画（Rise：开 300ms EASE_OUT_EXPO；关 100ms LINEAR，scale→0 时关屏）。 */
+ /** 打开/关闭动画。 */
     private float windowAnim(long nowNs) {
         if (!closing) {
             float t = Math.min(1f, (nowNs - openNs) / 300_000_000f);
@@ -333,7 +321,7 @@ public class RiseClickGuiScreen extends Screen {
         langHits.clear();
         scriptHits.clear();
         try {
-            var im = com.ylmac.adapt.features.module.impl.render.InterfaceModule.get();
+            var im = com.ylmac.adapt.module.render.InterfaceModule.get();
             shadersOn = im != null && im.shadersEnabled();
         } catch (Throwable ignored) {
             shadersOn = false;
@@ -343,7 +331,7 @@ public class RiseClickGuiScreen extends Screen {
         collecting = true;
         drawWindowContent(c, mx, my, nowNs, dtMs, guiW, guiH, false);
 
-        // Bloom 通道（Rise：把主通道全部绘制再跑一遍 → 模糊 → 叠加）
+ // Bloom 通道
         if (shadersOn) {
             collecting = false;
             drawBloom(c, mx, my, nowNs, dtMs, guiW, guiH);
@@ -352,10 +340,10 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * 窗口内容绘制（主通道 / bloom 通道共用）。
-     *
-     * @param plainAlpha true = 不套开合淡入（bloom 通道用）
-     */
+ * 窗口内容绘制（主通道 / bloom 通道共用）。
+ *
+ * @param plainAlpha true = 不套开合淡入（bloom 通道用）
+ */
     private void drawWindowContent(Canvas c, float mx, float my, long nowNs, float dtMs,
                                    int guiW, int guiH, boolean plainAlpha) {
         dtTheme = dtMs;
@@ -363,7 +351,6 @@ public class RiseClickGuiScreen extends Screen {
         float opacity = plainAlpha ? 1f
                 : (closing ? 1f : Math.min(1f, (nowNs - openNs) / 300_000_000f));
         if (opacity < 0.01f) opacity = 0.01f;
-        // Rise SidebarCategory.renderSidebar：axT 只在 qa() 页（ThemeScreen）随自动隐藏变化；
         // 其它页面每帧都 +elapsed*2 直到 255 → 恒为满不透明。打开界面第一帧就是 255，
         // 不会"栏目先消失再飞回来"。
         sidebarAlpha = 255f;
@@ -376,7 +363,7 @@ public class RiseClickGuiScreen extends Screen {
         c.scale(anim, anim);
         c.translate(-cx, -cy);
 
-        // 1) 窗口投影（仅 axS > 0.993；Rise 原式 alpha 1..5 × 19 层）
+ // 1) 窗口投影
         if (anim > 0.993f) {
             dropShadow(c, wx, wy, W, H, SHADOW_EXPAND, SHADOW_CORNER);
         }
@@ -385,7 +372,6 @@ public class RiseClickGuiScreen extends Screen {
         paint.setColor(C_BACKGROUND);
         c.drawRRect(RRect.makeXYWH(wx, wy, W, H, ROUND), paint);
 
-        // 3) 页面内容（裁到窗口）—— Rise oT 顺序：页面 → 转场遮罩 → 9 圆 → 侧栏
         int s1 = c.save();
         try {
             c.clipRRect(RRect.makeXYWH(wx + 1f, wy + 1f, W - 2f, H - 2f, ROUND),
@@ -393,8 +379,7 @@ public class RiseClickGuiScreen extends Screen {
             drawModuleArea(c, mx, my, nowNs, dtMs, guiW);
             drawScrollbar(c);
             drawColorPicker(c);
-            // 4) 切页遮罩（BACKGROUND alpha k）：**盖在页面上、但盖不到侧栏** ——
-        //    Rise 把遮罩画在 sidebar.pF() 之前，所以换栏目时只有内容在闪，侧栏不动
+            // 4) 切页遮罩（BACKGROUND alpha k）：**盖在页面上、但盖不到侧栏** —
         drawPageOverlay(c, nowNs);
         } finally {
             c.restoreToCount(s1);
@@ -406,7 +391,7 @@ public class RiseClickGuiScreen extends Screen {
             c.drawCircle(wx + SIDEBAR_W, wy + H / 2f, l * 50f / 2f, paint);
         }
 
-        // 6) 侧栏 + 品牌 + 分类（含 Rise 的滑出/收回动画；永远画在遮罩之上）
+ // 6) 侧栏 + 品牌 + 分类
         drawSidebar(c, mx, my, dtMs);
 
         c.restore();
@@ -414,12 +399,9 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * Rise BLOOM 通道（Interface.Shaders 开启时）：
-     * Rise 把主通道的**全部绘制命令**再入队一次（BLOOM 队列），
-     * 经 bloom.frag（radius 14 / compression 2）模糊后按 ONE / ONE_MINUS_SRC_ALPHA 叠加。
-     * 这里等价实现：整屏内容重绘到半分辨率离屏 → 高斯 σ=7 → PLUS 合成。
-     * （默认关，与 Rise Interface.Shaders=false 一致。）
-     */
+ * 经 bloom.frag（radius 14 / compression 2）模糊后按 ONE / ONE_MINUS_SRC_ALPHA 叠加。
+ * 这里等价实现：整屏内容重绘到半分辨率离屏 → 高斯 σ=7 → PLUS 合成。
+ */
     private void drawBloom(Canvas c, float mx, float my, long nowNs, float dtMs, int guiW, int guiH) {
         var ctx = GpuContextHelper.getOrCreateContext();
         if (ctx == null) return;
@@ -452,15 +434,14 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * Rise RenderUtil.dropShadow 原式：
-     * <pre>
-     *   for (f = 0; f <= iters/2; f += 0.5)
-     *       roundedRectangle(x − f/2, y − f/2, w + f, h + f, corner,
-     *                        Color(0,0,0, (int)max(0.5, (spread − f·1.2) / 5.5)));
-     * </pre>
-     * 每层 alpha 只有 1..5，叠 19 层才形成很柔的暗晕 —— 之前按"层 alpha 放大到 140"画，
-     * 所以影子又黑又硬（用户："影子好奇怪"）。
-     */
+ * <pre>
+ * for (f = 0; f <= iters/2; f += 0.5)
+ * roundedRectangle(x − f/2, y − f/2, w + f, h + f, corner,
+ * Color(0,0,0, (int)max(0.5, (spread − f·1.2) / 5.5)));
+ * </pre>
+ * 每层 alpha 只有 1..5，叠 19 层才形成很柔的暗晕 — 之前按"层 alpha 放大到 140"画，
+ * 所以影子又黑又硬（用户："影子好奇怪"）。
+ */
     private void dropShadow(Canvas c, float x, float y, float w, float h, float spread, float corner) {
         for (float f = 0f; f <= SHADOW_ITERS / 2f; f += 0.5f) {
             int a = (int) Math.max(0.5, (spread - f * 1.2) / 5.5);
@@ -470,12 +451,10 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     private void drawSidebar(Canvas c, float mx, float my, float dtMs) {
-        // ── Rise SidebarCategory 原式：动画目标 0 / −aym/1.5 = −66.67，
-        //    时长：显示 2000ms、隐藏 700ms（EASE_OUT_EXPO）；侧栏宽度 = 100 + anim ──
-        // ⚠ Rise 原版在 Theme 页鼠标移出左侧区域就收起侧栏（动画 −66.67px）→ 栏目被拖到窗口外，
-        //   用户实测"滑动时栏目全被拖到界面外"。这里改成**只有鼠标离开整个窗口**才收起。
+        // 时长：显示 2000ms、隐藏 700ms（EASE_OUT_EXPO）；侧栏宽度 = 100 + anim ──
+        // 用户实测"滑动时栏目全被拖到界面外"。这里改成**只有鼠标离开整个窗口**才收起。
         // ⚠ 单帧误判会让 EASE_OUT_EXPO 的滑出立刻跑掉 ~10px 再回来（"抖一下像收起又回来"）
-        //   → 用「鼠标连续离开窗口 200ms」才收起（滞回），并留 60px 余量
+        // → 用「鼠标连续离开窗口 200ms」才收起（滞回），并留 60px 余量
         Minecraft mc0 = Minecraft.getInstance();
         boolean inWindow = mx > -60f && mx < mc0.getWindow().getGuiScaledWidth() / uiScale + 60f
                 && my > -60f && my < mc0.getWindow().getGuiScaledHeight() / uiScale + 60f;
@@ -491,13 +470,11 @@ public class RiseClickGuiScreen extends Screen {
         if (collecting) sidebarAnim.update(dtMs);
         float sbAnim = sidebarAnim.value();
         float sbW = SIDEBAR_W + sbAnim;
-        // Rise axT：显示时每 ms +2、收起时每 ms −1.5（收起时整条侧栏同时淡出）
         sidebarAlpha = clamp(sidebarAlpha + (sidebarShown ? 2f : -1.5f) * dtMs, 0f, 255f);
         int sa = (int) sidebarAlpha;
 
         // ⚠ 整个侧栏（面板 + 渐隐 + 品牌 + 栏目）必须都在**窗口裁剪**内：
-        //   Rise 是整窗 scissor；我原来只裁了面板，品牌/栏目文字画在裁剪外 →
-        //   侧栏一收起，栏目文字就画到窗口外面去了（用户实测："文字显示在界面外"）
+        // 侧栏一收起，栏目文字就画到窗口外面去了（用户实测："文字显示在界面外"）
         int s = c.save();
         try {
             c.clipRRect(RRect.makeXYWH(wx, wy, W, H, ROUND), ClipMode.INTERSECT, true);
@@ -505,7 +482,7 @@ public class RiseClickGuiScreen extends Screen {
             // 1) 面板（左圆角由窗口圆角裁出）
             paint.setColor(withAlpha(C_SECONDARY & 0xFFFFFF, sa));
             c.drawRect(Rect.makeXYWH(wx, wy, sbW, H), paint);
-            // 2) 右缘 30px 黑色渐隐（Rise: 黑 alpha 0 → ≈36 → 透明）
+ // 2) 右缘 30px 黑色渐隐
             float fx = wx + sbW;
             paint.setShader(Shader.makeLinearGradient(fx, 0f, fx + 30f, 0f,
                     new int[]{withAlpha(0x000000, (int) (36 * sa / 255f)), 0x00000000},
@@ -513,8 +490,8 @@ public class RiseClickGuiScreen extends Screen {
             c.drawRect(Rect.makeXYWH(fx, wy, 30f, H), paint);
             paint.setShader(null);
 
-            // 3) 品牌（Rise SidebarCategory.renderSidebar 原式）
-            //    f = axI.x + 9 + anim；f1 = axI.y + 24.75 − height(42pt)/2
+ // 3) 品牌
+            // f = axI.x + 9 + anim；f1 = axI.y + 24.75 − height(42pt)/2
             int ta = sa;
             float f = wx + 9f + sbAnim;
             float f1 = wy + 24.75f - f42.height() / 2f;
@@ -557,7 +534,7 @@ public class RiseClickGuiScreen extends Screen {
             c.restoreToCount(s);
         }
 
-        // 命中框在裁剪外也算（Rise 的 scissor 只影响绘制）——但收起时不该可点
+ // 命中框在裁剪外也算—但收起时不该可点
         if (sidebarAlpha > 40f) {
             for (int i = 0; i < cats.size() + 4; i++) {
                 float catY = wy + CAT_Y0 + CAT_STEP * i;
@@ -592,7 +569,6 @@ public class RiseClickGuiScreen extends Screen {
     private static final int PAGE_SCRIPT = 6, PAGE_THEME = 7, PAGE_LANG = 8;
 
     private void drawModuleArea(Canvas c, float mx, float my, long nowNs, float dtMs, int guiW) {
-        // Rise oT：axL = (切换后 < 200ms) ? 旧页 : 新页 —— 前 200ms 仍渲染**旧页**，
         // 黑幕在 t=200ms 把窗口盖到最暗，之后才切换成新页（"按下栏目会有特殊的动画"）
         int keepPage = page;
         boolean transition = pageSwitchNs != 0L && (nowNs - pageSwitchNs) / 1_000_000f < 200f
@@ -618,14 +594,13 @@ public class RiseClickGuiScreen extends Screen {
         boolean search = page == 0;
         float topExtra = search ? 28f : 0f;
 
-        // 内容高度（Rise: scale.y + 7 步进，用动画行高）
+ // 内容高度
         float contentH = 0f;
         for (Module m : mods) {
             float h = rowHeight(m);
             RowUi ui = rowUi.get(m);
             contentH += (ui == null ? h : ROW_H + (h - ROW_H) * ui.expand.value()) + ROW_GAP;
         }
-        // Rise ScrollUtil.V：CategoryScreen → −contentH + H − 7；SearchScreen → −contentH + H − 37
         scrollMin = Math.min(0f, -contentH + H - (search ? 37f : 7f));
 
         if (search) drawSearchBox(c, mx, my, guiW);
@@ -637,7 +612,7 @@ public class RiseClickGuiScreen extends Screen {
             if (y + h >= wy && y + ROW_GAP <= wy + H) {
                 drawRow(c, m, x0, y, h, mx, my, dtMs, guiW);
             }
-            // 步进 = 动画行高 + 7（Rise CategoryScreen：d0 += moduleComponent.scale.y + 7）
+ // 步进 = 动画行高 + 7
             RowUi ui = rowUi.get(m);
             float animated = ui == null ? h : ROW_H + (h - ROW_H) * ui.expand.value();
             y += animated + ROW_GAP;
@@ -645,9 +620,8 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * Rise ModuleComponent：f1 = 38；每个可见值只累加自身 height（**无额外间隙**）；
-     * 循环结束 f1-- → 展开高 = 38 + Σh − 1。
-     */
+ * 循环结束 f1-- → 展开高 = 38 + Σh − 1。
+ */
     private float rowHeight(Module m) {
         if (!Boolean.TRUE.equals(expanded.get(m))) return ROW_H;
         float h = 0f;
@@ -671,11 +645,10 @@ public class RiseClickGuiScreen extends Screen {
     private void drawRow(Canvas c, Module m, float x, float y, float h, float mx, float my,
                          float dtMs, int guiW) {
         RowUi ui = rowUi.computeIfAbsent(m, k -> new RowUi());
-        // Rise ModuleComponent.click：命中框高 = moduleDefaultScale.y − 3 = 35（不是 38）
         float topH = Math.min(h, ROW_H - 3f);
         boolean hovered = mx >= x && mx <= x + ROW_W && my >= y && my <= y + topH;
 
-        // 展开动画（Rise：EASE_OUT_EXPO，时长 min(3ms×目标高, 450ms)）
+ // 展开动画
         float targetH = rowHeight(m);
         float targetVal = Boolean.TRUE.equals(expanded.get(m)) ? 1f : 0f;
         float dur = Math.min(450f, Math.max(60f, 3f * Math.max(1f, targetH - ROW_H)));
@@ -684,7 +657,6 @@ public class RiseClickGuiScreen extends Screen {
         if (collecting) {
             ui.expand.setTarget(targetVal);
             ui.expand.update(dtMs);
-            // Rise ayf：内容透明度独立动画（展开 duration/2、收起 duration/3，LINEAR）
             ui.content.setDuration(Boolean.TRUE.equals(expanded.get(m)) ? Math.max(1f, dur / 2f)
                     : Math.max(1f, dur / 3f));
             ui.content.setTarget(Boolean.TRUE.equals(expanded.get(m)) ? 255f : 0f);
@@ -700,14 +672,12 @@ public class RiseClickGuiScreen extends Screen {
             ui.press.update(dtMs);
         }
 
-        // ⚠ Rise 的行高是**动画值**（this.scale.y = aye.getValue()），背景/悬停层都按它画，
-        //   后续行的步进也用 scale.y + 7 → 展开时下面的行被平滑推下去，而不是瞬间跳。
+        // 后续行的步进也用 scale.y + 7 → 展开时下面的行被平滑推下去，而不是瞬间跳。
         float bgH = ROW_H + (h - ROW_H) * e;
         paint.setColor(C_OVERLAY);
         c.drawRRect(RRect.makeXYWH(x, y, ROW_W, bgH, ROW_R), paint);
         float ov = Math.max(ui.hover.value(), ui.press.value());
         if (ov > 0.5f) {
-            // Rise：悬停叠加纯黑 alpha 20 / 按住 35（LINEAR 50ms）
             paint.setColor(withAlpha(0x000000, (int) ov));
             c.drawRRect(RRect.makeXYWH(x, y, ROW_W, bgH, ROW_R), paint);
         }
@@ -730,12 +700,11 @@ public class RiseClickGuiScreen extends Screen {
         addHit(rowHits, new Object[]{m, x, y, ROW_W, topH});
 
         // 展开的设置项：裁到行动画高度；每个值行 alpha = 内容动画值，
-        // 仅当自己的 y < 行顶 + 动画行高 + 15 时才显示（Rise ModuleComponent 的 U(...) 规则）
+ // 仅当自己的 y < 行顶 + 动画行高 + 15 时才显示
         if (e > 0.01f || ui.content.value() > 0.5f) {
-            // ⚠ Rise **不裁剪**值行——它靠下面的 alpha 规则（值 y < 行顶 + 动画行高 + 15 才显示）。
-            //   之前用 clipRect 硬裁：展开过程中文字被切一半 → "展开界面排版错误"。
+            // 之前用 clipRect 硬裁：展开过程中文字被切一半 → "展开界面排版错误"。
             {
-                float vy = y + ROW_H + 1f;           // Rise：首个值在 position.y + 38 + 1
+                float vy = y + ROW_H + 1f;
                 for (Setting<?> st : m.getSettings()) {
                     if (!visible(st)) continue;
                     float vh = valueHeight(st);
@@ -748,25 +717,23 @@ public class RiseClickGuiScreen extends Screen {
         }
     }
 
-    /** Rise SearchScreen：文本框 @(axI.x+100+(400−100)/2, axI.y+17+scroll)，20pt CENTER，宽 150。 */
     private void drawSearchBox(Canvas c, float mx, float my, int guiW) {
         float bx = wx + SIDEBAR_W + (W - SIDEBAR_W) / 2f;
         float by = wy + 17f + scroll;
-        // 滚动时文字淡出（Rise：目标滚动为负 → 每 ms −4，否则 +4）
+ // 滚动时文字淡出
         searchTextAlpha += (scrollTarget < 0f ? -4f : 4f) * 16f;
         searchTextAlpha = clamp(searchTextAlpha, 0f, 255f);
         int col = withAlpha(0xFFFFFF, (int) searchTextAlpha);
         drawTextBox(c, f20, bx, by, 150f, col, true, true, searchText, "Start typing to search...", true);
     }
 
-    /** 搜索框文字透明度（Rise SearchScreen.axT） */
+ /** 搜索框文字透明度 */
     private float searchTextAlpha = 255f;
 
     private void drawScrollbar(Canvas c) {
         float trackX = wx + W - 4f;
         float trackY = wy + 7f;
         if (scrollMin >= 0f || scroll == 0f && scrollTarget == 0f && scrollMin == 0f) {
-            // 无滚动：Rise 依然按公式画（内容不足时滑块=满高）→ 保留公式
         }
         float contentH = SCROLL_TRACK_H - scrollMin;     // scrollMin ≤ 0
         if (contentH <= SCROLL_TRACK_H) {
@@ -784,16 +751,12 @@ public class RiseClickGuiScreen extends Screen {
 
     // ───────────────────────── 设置项（ValueRow） ─────────────────────────
 
-    /**
-     * 单个设置项绘制 —— 全部按 Rise 原控件几何（components/value/impl/*）。
-     */
-    private void drawValue(Canvas c, Setting<?> s, float x, float y, float mx, float my, int alphaMul, int guiW) {
+        private void drawValue(Canvas c, Setting<?> s, float x, float y, float mx, float my, int alphaMul, int guiW) {
         float lw16 = f16.getStringWidth(s.getName());
 
         if (s instanceof BoolSetting bs) {
-            // Rise BooleanValueComponent：标签 16pt；d0 = x + width16 + 3；
-            //   底孔 5×5 r2.5 BACKGROUND @(d0+2.5, y+2.5) 中心；
-            //   accent 圆点 axp×axp r=axp/2（axp: 0→5，elapsedMs/20）
+            // 底孔 5×5 r2.5 BACKGROUND @(d0+2.5, y+2.5) 中心；
+            // accent 圆点 axp×axp r=axp/2（axp: 0→5，elapsedMs/20）
             int label = mulAlpha(C_SECONDARY_TEXT, alphaMul);
             f16.drawText(c, s.getName(), x, y, label, textPaint);
             float d0 = x + lw16 + 3f;
@@ -826,7 +789,6 @@ public class RiseClickGuiScreen extends Screen {
             return;
         }
         if (s instanceof StringSetting ss) {
-            // Rise StringValueComponent：标签 16pt @(x,y)；文本框 @(x, y+14) 宽 230.5，白字 16pt（无底色）
             f16.drawText(c, s.getName(), x, y, mulAlpha(C_SECONDARY_TEXT, alphaMul), textPaint);
             boolean editing = numericEdit && dragSetting == ss;
             drawTextBox(c, f16, x, y + 14f, 230.5f, mulAlpha(0xFFFFFF, alphaMul), false, editing,
@@ -834,7 +796,6 @@ public class RiseClickGuiScreen extends Screen {
             return;
         }
         if (s instanceof ColorSetting cs) {
-            // Rise ColorValueComponent：标签 16pt；f = width16+4；色块 (x+f, y, 15, 7, r2.5)
             f16.drawText(c, s.getName(), x, y, mulAlpha(C_SECONDARY_TEXT, alphaMul == 255 ? 255 : alphaMul), textPaint);
             float f = lw16 + 4f;
             Color col = cs.getValue();
@@ -847,12 +808,12 @@ public class RiseClickGuiScreen extends Screen {
             f16.drawText(c, s.getName(), x, y, mulAlpha(accent(y / 5f), alphaMul), textPaint);
             return;
         }
-        if (s instanceof com.ylmac.adapt.features.module.settings.impl.KeybindSetting ks) {
+        if (s instanceof com.ylmac.adapt.module.settings.impl.KeybindSetting ks) {
             // 按键：按 Mode 行画（标签 + 当前键名）
             drawMode(c, s, x, y, keyName(ks.getValue()), alphaMul);
             return;
         }
-        if (s instanceof com.ylmac.adapt.features.module.settings.impl.StringListSetting sl) {
+        if (s instanceof com.ylmac.adapt.module.settings.impl.StringListSetting sl) {
             java.util.List<String> v = sl.getValue();
             String joined = v == null || v.isEmpty() ? "无" : String.join(", ", v);
             if (joined.length() > 28) joined = joined.substring(0, 28) + "...";
@@ -866,19 +827,19 @@ public class RiseClickGuiScreen extends Screen {
         drawMode(c, s, x, y, summary, alphaMul);
     }
 
-    /** GLFW 键码 → 显示名（Rise 的 .bind 同款文案） */
+ /** GLFW 键码 → 显示名 */
     private static String keyName(Integer code) {
         if (code == null || code == 0) return "无";
-        return org.lwjgl.glfw.GLFW.glfwGetKeyName(code, 0) != null
-                ? org.lwjgl.glfw.GLFW.glfwGetKeyName(code, 0).toUpperCase()
+        return com.ylmac.adapt.input.GLFW.glfwGetKeyName(code, 0) != null
+                ? com.ylmac.adapt.input.GLFW.glfwGetKeyName(code, 0).toUpperCase()
                 : ("键 " + code);
     }
 
     /**
-     * Number 控件（Rise NumberValueComponent 原式）：
-     * f = width16(名)+7；轨道 rrect(x+f, y+1.5, 100, 2, r1)；
-     * 手柄 rrect(trackX + t·100 − 2.5, y, 5, 5, r2.5)；数值文本框 @(x+f+105, y) 宽 20。
-     */
+ * Number 控件：
+ * f = width16(名)+7；轨道 rrect(x+f, y+1.5, 100, 2, r1)；
+ * 手柄 rrect(trackX + t·100 − 2.5, y, 5, 5, r2.5)；数值文本框 @(x+f+105, y) 宽 20。
+ */
     private void drawNumber(Canvas c, Setting<?> s, float x, float y, int alphaMul,
                             double value, double min, double max, boolean isInt) {
         f16.drawText(c, s.getName(), x, y, mulAlpha(C_SECONDARY_TEXT, alphaMul), textPaint);
@@ -901,7 +862,7 @@ public class RiseClickGuiScreen extends Screen {
         drawTextBox(c, f16, x + f + 105f, y, 20f, mulAlpha(C_SECONDARY_TEXT, alphaMul), false, editing, vs, "", false);
     }
 
-    /** Mode/List 控件（Rise ModeValueComponent）：标签+":"，值 @x+width16(label+":")+2。 */
+ /** Mode/List 控件：标签+":"，值 @x+width16(label+":")+2。 */
     private void drawMode(Canvas c, Setting<?> s, float x, float y, String value, int alphaMul) {
         String labelTxt = s.getName() + ":";
         f16.drawText(c, labelTxt, x, y, mulAlpha(C_SECONDARY_TEXT, alphaMul), textPaint);
@@ -909,9 +870,8 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * Rise TextBox.draw 等价：无底色；空文本画占位符（alpha × selected?0.3:0.2）；
-     * CENTER 对齐时位置按 (posX·19+目标)/20 每 ms 平滑；选中时光标 "|" 正弦闪烁。
-     */
+ * CENTER 对齐时位置按 (posX·19+目标)/20 每 ms 平滑；选中时光标 "|" 正弦闪烁。
+ */
     private void drawTextBox(Canvas c, RiseFont font, float x, float y, float width, int color,
                              boolean center, boolean selected, String text, String placeholder, boolean isSearch) {
         boolean empty = text == null || text.isEmpty();
@@ -941,7 +901,6 @@ public class RiseClickGuiScreen extends Screen {
             font.drawText(c, draw, px, y, color, textPaint);
         }
         if (selected) {
-            // Rise：光标 = "|"（18pt），alpha = (sin(now/150)+1)/2·255
             float caretAlpha = (float) ((Math.sin(System.currentTimeMillis() / 150.0) + 1.0) / 2.0 * 255.0);
             f16.drawText(c, "|", px + w + 1f, y - 1f, withAlpha(0xFFFFFF, (int) caretAlpha), textPaint);
         }
@@ -968,11 +927,10 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * Rise ColorValueComponent 面板（aza=105, azb=120 → 可见高 105）：
-     * 外壳 SECONDARY r(round−3) + 内衬 BACKGROUND；SV = 104×66 r7（白→色相 RGQ + 黑罩）；
-     * 色相条 88×7 @(+8.5, +70)，指示块 11×11 r(round/3+1) 描边 1px 黑；
-     * 预览色块 15×15.5 r3.5；光标 7/6/5 三层；RGB 17pt @+8.5/+30/+51；hex 13pt；两个 60×10 复制热区。
-     */
+ * 外壳 SECONDARY r(round−3) + 内衬 BACKGROUND；SV = 104×66 r7（白→色相 RGQ + 黑罩）；
+ * 色相条 88×7 @(+8.5, +70)，指示块 11×11 r(round/3+1) 描边 1px 黑；
+ * 预览色块 15×15.5 r3.5；光标 7/6/5 三层；RGB 17pt @+8.5/+30/+51；hex 13pt；两个 60×10 复制热区。
+ */
     private void drawColorPanel(Canvas c, ColorSetting cs, float ignoreX, float ignoreY, int alphaMul) {
         float[] r = colorPanelRect(cs);
         if (r == null) return;
@@ -1031,7 +989,7 @@ public class RiseClickGuiScreen extends Screen {
         paint.setColor(col.getRGB());
         c.drawRRect(RRect.makeXYWH((float) d4, pvY, 15f, 15.5f, 3.5f), paint);
 
-        // SV 光标（Rise 7/6/5 三层圆角块）
+ // SV 光标
         float cx = (float) (d0 + cur[0]), cy = (float) (d1 + cur[1]);
         paint.setColor(0xFFFFFFFF); c.drawRRect(RRect.makeXYWH(cx - 2.5f, cy - 2.5f, 7f, 7f, 3.5f), paint);
         paint.setColor(0xFF000000); c.drawRRect(RRect.makeXYWH(cx - 2f, cy - 2f, 6f, 6f, 3f), paint);
@@ -1058,7 +1016,6 @@ public class RiseClickGuiScreen extends Screen {
         f13.drawText(c, "HEX", (float) czX + 24f, (float) (czY + 14.5), C_SECONDARY_TEXT, textPaint);
     }
 
-    /** Rise RGQ 变体：显式两端色（color = mix(c1,c2, 0.5+0.5·sin(3(t+time))))。 */
     private static Shader rgq(float x, float y, float w, float h, boolean vertical, int c1, int c2) {
         int n = 24;
         int[] cols = new int[n];
@@ -1089,13 +1046,12 @@ public class RiseClickGuiScreen extends Screen {
         drawColorPanel(c, cs, 0f, 0f, 255);
     }
 
-    // ── 切页过渡（Rise：旧页 200ms + 黑幕 200ms） ──
+ // ── 切页过渡 ──
 
     /**
-     * Rise oT 切页过渡：遮罩 = BACKGROUND(23,26,33) alpha k，
-     * k = 255 − min(255, t<200 ? 255 − t·1.275 : (t−200)·1.275)，t ≤ 400ms。
-     * t=0 → 0（无遮罩）；t=200 → 255（整窗被底色盖住，此刻换页）；t=400 → 0。
-     */
+ * k = 255 − min(255, t<200 ? 255 − t·1.275: (t−200)·1.275)，t ≤ 400ms。
+ * t=0 → 0（无遮罩）；t=200 → 255（整窗被底色盖住，此刻换页）；t=400 → 0。
+ */
     private void drawPageOverlay(Canvas c, long nowNs) {
         if (pageSwitchNs == 0L) return;
         float t = (nowNs - pageSwitchNs) / 1_000_000f;
@@ -1112,7 +1068,6 @@ public class RiseClickGuiScreen extends Screen {
     private boolean leftDown;
     /** bloom 通道重绘时不收集命中（否则命中表重复） */
     private boolean collecting = true;
-    /** Rise Interface.Shaders：true 才跑 bloom 通道（默认与 Rise 一致 = false） */
     private boolean shadersOn;
 
     @Override
@@ -1121,7 +1076,7 @@ public class RiseClickGuiScreen extends Screen {
         int btn = e.button();
         if (btn == GLFW.GLFW_MOUSE_BUTTON_LEFT) leftDown = true;
 
-        // 拖动窗口（Rise：顶部 15px）
+ // 拖动窗口
         if (btn == GLFW.GLFW_MOUSE_BUTTON_LEFT
                 && mx > wx && mx < wx + W && my > wy && my < wy + 15f) {
             dragging = true;
@@ -1193,12 +1148,11 @@ public class RiseClickGuiScreen extends Screen {
             return true;
         }
 
-        // 模块行：左键开关 / 右键展开（取色面板打开时模态阻挡 —— Rise overlayPresent）
+ // 模块行：左键开关 / 右键展开
         if (openColor != null) return false;
         for (Object[] hit : rowHits) {
             if (!inside(mx, my, hit)) continue;
             Module m = (Module) hit[0];
-            // Rise：行操作还要求鼠标在窗口内（flag2 = GUIUtil.c(窗口矩形)）
             if (!hit(mx, my, wx, wy, W, H)) continue;
             if (btn == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
                 boolean has = false;
@@ -1214,9 +1168,8 @@ public class RiseClickGuiScreen extends Screen {
 
     private boolean handleValueClick(Setting<?> s, float mx, float my, int btn, float x, float y) {
         float lw = f16.getStringWidth(s.getName());
-        float hitW = Minecraft.getInstance().getWindow().getGuiScaledWidth() - 70f;   // Rise 原式
+        float hitW = Minecraft.getInstance().getWindow().getGuiScaledWidth() - 70f;
         if (s instanceof BoolSetting bs) {
-            // Rise BooleanValueComponent.e：(x, y−3.5, width−70, 14)
             if (hit(mx, my, x, y - 3.5f, hitW, 14f)) {
                 bs.setValue(!Boolean.TRUE.equals(bs.getValue()));
                 return true;
@@ -1261,7 +1214,6 @@ public class RiseClickGuiScreen extends Screen {
         }
         if (s instanceof ColorSetting cs) {
             float f = lw + 4f;
-            // Rise ColorValueComponent.e：点色块/行区域开合（ayU）
             if (openColor == cs) {
                 // 面板已开：先判 SV / 色相条拖动
                 float[] r = colorPanelRect(cs);
@@ -1284,7 +1236,7 @@ public class RiseClickGuiScreen extends Screen {
                     openColor = null;
                     return true;
                 }
-                openColor = null;   // 点面板外 = 收起（Rise overlayPresent 语义：本次点击不再传给行）
+                openColor = null;
                 return true;
             }
             if (hit(mx, my, x + f, y - 2f, 20f, 12f) || hit(mx, my, x, y - 3.5f, hitW, 15f)) {
@@ -1303,7 +1255,7 @@ public class RiseClickGuiScreen extends Screen {
             }
             return false;
         }
-        if (s instanceof com.ylmac.adapt.features.module.settings.impl.KeybindSetting ks) {
+        if (s instanceof com.ylmac.adapt.module.settings.impl.KeybindSetting ks) {
             if (hit(mx, my, x, y - 3.5f, hitW, 14f) && btn == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
                 ks.setValue(0);
                 return true;
@@ -1317,7 +1269,7 @@ public class RiseClickGuiScreen extends Screen {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
-    /** Number 命中（Rise：轨道 (x+f−5, y−3.5, 110, 14)；文本框 (x+f+105, y, 20)）。 */
+ /** Number 命中。 */
     private boolean numericClick(Setting<?> s, float mx, float my, float x, float y,
                                  double min, double max, boolean isInt) {
         float f = f16.getStringWidth(s.getName()) + 7f;
@@ -1348,7 +1300,6 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     private void applyTrack(float mx, double min, double max, boolean isInt) {
-        // Rise：azj = (mouseX − (x+f)) / 100，clamp 0..1，再按小数位取整
         double frac = clamp((mx - dragTrackX) / 100.0, 0.0, 1.0);
         double v = min + (max - min) * frac;
         if (isInt && dragSetting instanceof IntSetting is) {
@@ -1362,12 +1313,11 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * Rise ColorValueComponent 取色公式：
-     *   p = (clamp(mx−d0, 0, aza), clamp(my−d1, 0, d2))
-     *   inner = ColorUtil.a(hueColor, WHITE, p.x/aza)   // hue·t + white·(1−t)
-     *   color = ColorUtil.a(transparent, inner, p.y/d2) // 全分量（含 alpha）一起 lerp
-     * 即：横轴 = 色相混白，纵轴 = 亮度并带 alpha 衰减（底部 alpha 0）。
-     */
+ * p = (clamp(mx−d0, 0, aza), clamp(my−d1, 0, d2))
+ * inner = ColorUtil.a(hueColor, WHITE, p.x/aza) / hue·t + white·(1−t)
+ * color = ColorUtil.a(transparent, inner, p.y/d2) / 全分量（含 alpha）一起 lerp
+ * 即：横轴 = 色相混白，纵轴 = 亮度并带 alpha 衰减（底部 alpha 0）。
+ */
     private void applyColor(ColorSetting cs, float mx, float my) {
         float[] r = colorPanelRect(cs);
         if (r == null) return;
@@ -1433,10 +1383,9 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * 滚轮：**每个事件立即累加**到目标（不再 50ms 节流丢弃）。
-     * MC（尤其 macOS 平滑滚动）会高频发**小数**增量，节流丢弃会导致一顿一顿的抖动；
-     * Rise 用 LWJGL2 的整数 120/格 所以看不出问题。平滑仍由 1%/ms 的 lerp 负责。
-     */
+ * 滚轮：**每个事件立即累加**到目标（不再 50ms 节流丢弃）。
+ * MC（尤其 macOS 平滑滚动）会高频发**小数**增量，节流丢弃会导致一顿一顿的抖动；
+ */
     private float pendingWheel;
 
     @Override
@@ -1453,7 +1402,6 @@ public class RiseClickGuiScreen extends Screen {
         if (key == GLFW.GLFW_KEY_ESCAPE) {
             if (numericEdit) { numericEdit = false; dragSetting = null; return true; }
             if (openColor != null) { openColor = null; return true; }
-            // Rise：关闭动画（scale → 0）结束后真正关屏
             closing = true;
             closeStartNs = System.nanoTime();
             return true;
@@ -1503,7 +1451,6 @@ public class RiseClickGuiScreen extends Screen {
             return true;
         }
         if (event.isAllowedChatCharacter()) {
-            // Rise：非搜索页/未输入过 → 切到搜索页并清空旧查询，再敲入首字符
             if (!searchTyped || page != 0) {
                 searchTyped = true;
                 searchText = "";
@@ -1516,7 +1463,7 @@ public class RiseClickGuiScreen extends Screen {
         return super.charTyped(event);
     }
 
-    /** 切页：保存旧页滚动状态 → 载入新页（Rise：各 Screen 独立 ScrollUtil，min 不会串页） */
+ /** 切页：保存旧页滚动状态 → 载入新页 */
     private void switchPage(int p) {
         if (p == page) return;
         saveScroll(page);
@@ -1544,10 +1491,10 @@ public class RiseClickGuiScreen extends Screen {
 
     // ───────────────────────── 工具 ─────────────────────────
 
-    // ─────────────────── THEME 页（Rise ThemeScreen 几何） ───────────────────
+ // ─────────────────── THEME 页 ───────────────────
 
     /** chips：宽 (400−100−43)/5 = 51.4、高 17、间距 7、行距 24，起点 (x+107, y+44+scroll)；
-     *  卡片：3 列 宽 (400−100−29)/3 = 90.3、高 50、间距 7、行距 57，起点 y+104+scroll。 */
+ * 卡片：3 列 宽 (400−100−29)/3 = 90.3、高 50、间距 7、行距 57，起点 y+104+scroll。 */
     private void drawThemePage(Canvas c, float mx, float my) {
         float baseX = wx + SIDEBAR_W + 7f;
         float y0 = wy + 44f + scroll;
@@ -1584,7 +1531,6 @@ public class RiseClickGuiScreen extends Screen {
             if (themeFilter != null && !t.hasKey(themeFilter)) continue;
             float tx0 = baseX + col2 * (cardW + 7f);
             float ty0 = cy0 + row2 * 57f;
-            // Rise ThemeComponent：x/y 用 EASE_OUT_QUINT 500ms 动画滑入
             float[] anim = themeCardAnim.computeIfAbsent(t, k -> new float[]{tx0, ty0});
             if (collecting) {
                 anim[0] += (tx0 - anim[0]) * Math.min(1f, dtTheme / 500f) * 3.2f;
@@ -1592,11 +1538,11 @@ public class RiseClickGuiScreen extends Screen {
             }
             float x = anim[0], y = anim[1];
             boolean active = RiseTheme.active() == t;
-            // 卡片：底色 OVERLAY + 主题主色渐变头（Rise 卡片渐变头 r=9）
+ // 卡片：底色 OVERLAY + 主题主色渐变头
             paint.setColor(C_OVERLAY);
             c.drawRRect(RRect.makeXYWH(x, y, cardW, 50f, 8f), paint);
             // ⚠ stop 必须严格递增：之前用 blendFactor 当第一个 stop，可能 > 0.999 → Skija 抛异常
-            //   → 整个 draw() 被 catch 掉 → 命中表没填 → "主题点了没反应 / 滚轮卡住"
+            // → 整个 draw 被 catch 掉 → 命中表没填 → "主题点了没反应 / 滚轮卡住"
             paint.setShader(Shader.makeLinearGradient(x, y, x + cardW, y,
                     new int[]{withAlpha(t.primary() & 0xFFFFFF, 210), withAlpha(t.secondary() & 0xFFFFFF, 210)},
                     new float[]{0f, 1f}));
@@ -1611,11 +1557,10 @@ public class RiseClickGuiScreen extends Screen {
             addHit(themeHits, new Object[]{t, x, y, cardW, 50f, 1});
             if (++col2 >= 3) { col2 = 0; row2++; }
         }
-        // Rise ThemeScreen：V(-57 * max(0, ceil(visible/3) - 3))
         int rows = Math.max(0, (int) Math.ceil(visibleCount / 3.0) - 3);
         scrollMin = -57f * rows;
         updateScroll(dtTheme);
-        // 标题（Rise：居中 @(窗口右−20, 顶部+20+scroll) 16pt alpha 128）
+ // 标题
         String tt = RiseLang.tr("ui.theme");
         f16.drawText(c, tt, wx + W - 20f - f16.getStringWidth(tt) / 2f, wy + 20f + scroll,
                 withAlpha(0xFFFFFF, 128), textPaint);
@@ -1624,16 +1569,16 @@ public class RiseClickGuiScreen extends Screen {
     /** 主题页可见卡片数（供滚动下限公式用） */
     private int visibleCount;
 
-    // ─────────────────── LANGUAGE 页（Rise LanguageScreen 几何） ───────────────────
+ // ─────────────────── LANGUAGE 页 ───────────────────
 
     /**
-     * LANGUAGE 页（Rise LanguageScreen + LanguageComponent 原式）：
-     * 项 @(x+100+8, y + (i+1)*46 + scroll) 285×38 r6 OVERLAY；主行英文名 20pt
-     * （当前语言 = accent(0, y/5)）；副行本地名 17pt alpha 100；
-     * 国旗 15×15 @(x + width20(英文名) + 25, +5)（贴图拷贝自 Rise）；
-     * 顶部 40px BACKGROUND 条（仅上两角圆角）+ 居中标题 @(窗口右−20, 顶+20) 16pt alpha 128；
-     * 滚动下限 −2000（Rise 原值）。
-     */
+ * LANGUAGE 页：
+ * 项 @(x+100+8, y + (i+1)*46 + scroll) 285×38 r6 OVERLAY；主行英文名 20pt
+ * （当前语言 = accent(0, y/5)）；副行本地名 17pt alpha 100；
+ * 国旗 15×15 @(x + width20(英文名) + 25, +5)；
+ * 顶部 40px BACKGROUND 条（仅上两角圆角）+ 居中标题 @(窗口右−20, 顶+20) 16pt alpha 128；
+ * 滚动下限 −2000。
+ */
     private void drawLangPage(Canvas c, float mx, float my) {
         float x = wx + SIDEBAR_W + 8f;
         float y0 = wy + scroll;
@@ -1648,7 +1593,7 @@ public class RiseClickGuiScreen extends Screen {
             drawFlag(c, l.file(), x + f20.getStringWidth(l.english()) + 25f, y + 5f);
             addHit(langHits, new Object[]{l, x, y, 285f, 38f});
         }
-        scrollMin = -2000f;      // Rise LanguageScreen：V(-2000)
+        scrollMin = -2000f;
         updateScroll(dtTheme);
         int s0 = c.save();
         try {
@@ -1663,7 +1608,7 @@ public class RiseClickGuiScreen extends Screen {
                 withAlpha(0xFFFFFF, 128), textPaint);
     }
 
-    /** 国旗贴图（15×15；拷贝自 Rise：rise/icons/language/<file>.png） */
+ /** 国旗贴图 */
     private static final java.util.Map<String, Image> FLAGS = new HashMap<>();
 
     private void drawFlag(Canvas c, String file, float x, float y) {
@@ -1683,7 +1628,7 @@ public class RiseClickGuiScreen extends Screen {
                 Rect.makeXYWH(x, y, 15f, 15f), SamplingMode.LINEAR, null, false);
     }
 
-    // ─────────────────── SCRIPT 页（Rise ScriptScreen 几何） ───────────────────
+ // ─────────────────── SCRIPT 页 ───────────────────
 
     /** 横幅 110 高 OVERLAY alpha 100 r10；卡片 86.45×86.45 r8 间距 10；标题 20pt / 副标题 16pt。 */
     private void drawScriptPage(Canvas c, float mx, float my) {
@@ -1761,11 +1706,10 @@ public class RiseClickGuiScreen extends Screen {
         }
     }
 
-    /** 每页只自动 dump 一次（会话内）—— 便于逐值核对每个界面的排版 */
+    /** 每页只自动 dump 一次（会话内）— 便于逐值核对每个界面的排版 */
     private final boolean[] dumpedPage = new boolean[16];
     private final long[] pageShownNs = new long[16];
 
-    /** 把当前页渲染成 PNG 存到 ~/.adapt-risegui/page-<页名>.png（离线核对用）。 */
     private void autoDump(int guiW, int guiH) {
         if (page < 0 || page >= dumpedPage.length) return;
         if (pageShownNs[page] == 0L) pageShownNs[page] = System.nanoTime();
@@ -1797,15 +1741,13 @@ public class RiseClickGuiScreen extends Screen {
     }
 
     /**
-     * Rise ScrollUtil.E/qx 等价实现（**所有页面共用**）：
-     * - 有滚轮输入的那一帧：target += dWheel/2，clamp 到 [min − 30, 30]（橡皮筋）；
-     * - 其余帧：target 一律 clamp 回 [min, 0]（原来只在 min<0 时夹 → 顶部上滑会残留 +30 → 抖动）；
-     * - 平滑：每经过 1ms 做一次 lerp(scroll, target, 0.01)（不封顶步数，Rise 同款循环）。
-     */
+ * - 有滚轮输入的那一帧：target += dWheel/2，clamp 到 [min − 30, 30]（橡皮筋）；
+ * - 其余帧：target 一律 clamp 回 [min, 0]（原来只在 min<0 时夹 → 顶部上滑会残留 +30 → 抖动）；
+ * - 平滑：每经过 1ms 做一次 lerp(scroll, target, 0.01)。
+ */
     private void updateScroll(float dtMs) {
         if (!collecting) return;              // bloom 通道重绘不推进状态
         if (pendingWheel != 0f) {
-            // Rise 原版上界是 +30（向上橡皮筋），但实测顶部上滑会出现 ~5px 过冲→回弹的抖动；
             // 上界收到 0：顶部上滑不动（无抖动），向下仍保留 30px 橡皮筋
             scrollTarget = clamp(scrollTarget + pendingWheel, scrollMin - 30f, 0f);
             pendingWheel = 0f;
@@ -1819,7 +1761,7 @@ public class RiseClickGuiScreen extends Screen {
         if (Math.abs(scrollTarget - scroll) < 0.05f) scroll = scrollTarget;
     }
 
-    /** 屏幕坐标 → 设计坐标（draw() 里整体乘了 uiScale） */
+    /** 屏幕坐标 → 设计坐标（draw 里整体乘了 uiScale） */
     private float dX(double screenX) { return (float) (screenX / uiScale); }
 
     private float dY(double screenY) { return (float) (screenY / uiScale); }
@@ -1839,15 +1781,10 @@ public class RiseClickGuiScreen extends Screen {
         es.setValue(es.getModes()[idx]);
     }
 
-    /**
-     * Rise 强调色：ThemeManager 当前主题的 getAccentColor((0, y/5))
-     * （Rise 处处传 {@code new Vector2d(0.0, y / 5.0)}）。
-     */
-    private static int accent(float pos) {
+        private static int accent(float pos) {
         return RiseTheme.active().accentAt(0f, pos);
     }
 
-    /** Rise rz().rA()：主题主色（品牌版本号、9 个同心圆用它，不是流动色）。 */
     private static int themePrimary() {
         return RiseTheme.active().primary();
     }
@@ -1890,7 +1827,7 @@ public class RiseClickGuiScreen extends Screen {
     private static int clamp(int v, int lo, int hi) { return v < lo ? lo : Math.min(v, hi); }
     private static int clamp(double v, int lo, int hi) { return (int) clamp(v, (double) lo, (double) hi); }
 
-    // ── 动画（Rise util/animation/Animation + Easing 语义：按 duration 归一化单次插值） ──
+ // ── 动画 ──
 
     private enum Ease {
         LINEAR { float apply(float t) { return t; } },

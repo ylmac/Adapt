@@ -2,16 +2,16 @@
 
 // G-buffer 几何阶段（延迟渲染）。
 // 不做任何光照：只输出几何/材质/雾/光照贴图数据，光照全部推迟到全屏
-// light pass（adapt_deferred_light.fsh）执行完整 r5 adaptDoLighting +
+// light pass（adapt_deferred_light.fsh）执行完整 adaptDoLighting +
 // adaptShadowVisibility。Sodium 压缩顶点格式无法线属性，法线仍用解析
 // 导数重建（与 sodium_terrain.fsh 相同）。
-//
+
 // 6 个附件（设备 maxColorAttachments=8，实测 Apple M4 / MoltenVK）：
 // GB0 RGBA32F: xyz=视空间位置, w=coverage(1.0=几何)
 // GB1 RGBA16F: xyz=视空间法线, w=roughness
-// GB2 RGBA8 :  rgb=albedo(纹理×顶点色), a=metallic
+// GB2 RGBA8: rgb=albedo(纹理×顶点色), a=metallic
 // GB3 RGBA16F: rgb=雾色, a=fogFactor(雾混合系数=total_fog*FogColor.a)
-// GB4 RGBA32F: xyz=世界相对位置（阴影接收 + r5 光照需要）, w=vanillaAO
+// GB4 RGBA32F: xyz=世界相对位置（阴影接收 + 光照需要）, w=vanillaAO
 // GB5 RGBA16F: xy=lmCoordM(block/sky light), z=emissive, w=顶点色 alpha
 
 #moj_import <sodium:globals.glsl>
@@ -20,7 +20,7 @@
 
 in vec4 v_Color; // The interpolated vertex color
 in vec2 v_TexCoord; // The interpolated block texture coordinates
-in vec2 lmCoordM; // Reimagined GetLightMapCoordinates 处理后的光照贴图坐标（0-1）
+in vec2 lmCoordM; // GetLightMapCoordinates 处理后的光照贴图坐标（0-1）
 in vec4 adaptVertexColor; // 原版顶点色（AO 预乘 RGB，alpha 恒 1）
 in vec3 adaptFragPos; // Adapt：视空间片元位置
 in vec3 adaptWorldPos; // Adapt：世界相对片元位置（与 shadow caster 同空间）
@@ -110,7 +110,7 @@ void main() {
     }
 #endif
 
-    // albedo = tex * glColor.rgb —— 无 pow2.2 线性化（与 sodium_terrain.fsh 一致）
+    // albedo = tex * glColor.rgb — 无 pow2.2 线性化（与 sodium_terrain.fsh 一致）
     vec3 albedo = color.rgb * adaptVertexColor.rgb;
 
     // 法线：解析导数重建（视空间），非法线回退视向量（同 sodium_terrain.fsh）
@@ -125,7 +125,7 @@ void main() {
     }
 
     // 雾混合系数：与 sodium _linearFog 完全一致（fogValue * fogColor.a），
-    // 由 light pass 直接 mix 使用 —— 雾数据全部在几何阶段算好。
+    // 由 light pass 直接 mix 使用 — 雾数据全部在几何阶段算好。
 #ifdef USE_FOG
     float fogValue = max(1.0 - fadeFactor, total_fog_value(
             v_FragDistance.y, v_FragDistance.x,
@@ -141,11 +141,11 @@ void main() {
     gAlbedo = vec4(albedo, 0.0);       // a=metallic（地形 0.0）
     // rgb=雾色（light pass 用它做 mix），a=fogFactor
     gEmissiveFog = vec4(u_FogColor.rgb, fogFactor);
-    // 世界相对位置：阴影接收（adaptShadowVisibility）与 r5 光照都需要，与
+    // 世界相对位置：阴影接收（adaptShadowVisibility）与 光照都需要，与
     // shadow caster 几何同空间。w=vanillaAO：Sodium a_Color 的 alpha 恒 1
     // （AO 预乘进 RGB），与 sodium_terrain.fsh 传 1.0 一致。
     gWorldPos = vec4(adaptWorldPos, 1.0);
-    // xy=lmCoordM（r5 blockLight/skyLight 语义），z=emissive（当前 0，真实
+    // xy=lmCoordM（ blockLight/skyLight 语义），z=emissive（当前 0，真实
     // 发光体由 halo 光源系统提供），w=顶点色 alpha（透明方块/淡出）
     gLightmap = vec4(lmCoordM, 0.0, adaptVertexColor.a);
 }

@@ -40,7 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 
 private data class AlbumInfo(
     val title: String,
@@ -49,7 +49,7 @@ private data class AlbumInfo(
     val trackCount: Int,
 )
 
-/** LocalPage.qml — album grid (2-col, 3:2 art, r20) + album detail + sort/group chips. */
+/** — album grid (2-col, 3:2 art, r20) + album detail + sort/group chips. */
 @Composable
 fun LocalPage(
     pc: PlayerController,

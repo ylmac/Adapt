@@ -1,7 +1,7 @@
 package com.ylmac.adapt.compose.screens.music
 
-import com.ylmac.adapt.features.music.PlayerController
-import com.ylmac.adapt.features.music.bridge.SearchRow
+import com.ylmac.adapt.module.misc.music.PlayerController
+import com.ylmac.adapt.module.misc.music.bridge.SearchRow
 import java.util.Calendar
 
 internal fun mapStr(m: Map<*, *>?, key: String, fallback: String = ""): String =
@@ -27,7 +27,7 @@ internal fun <T> peekList(prop: Any?): List<T> =
 @Suppress("UNCHECKED_CAST")
 internal fun peekMaps(pcProp: Any?): List<Map<String, Any>> {
     return try {
-        val list = (pcProp as? com.ylmac.adapt.bind.Slot<*>)?.peek() as? List<*>
+        val list = (pcProp as? com.ylmac.adapt.config.Slot<*>)?.peek() as? List<*>
             ?: return emptyList()
         list.mapNotNull { item ->
             @Suppress("UNCHECKED_CAST")
@@ -40,7 +40,7 @@ internal fun peekMaps(pcProp: Any?): List<Map<String, Any>> {
 
 internal fun peekStrings(pcProp: Any?): List<String> {
     return try {
-        val list = (pcProp as? com.ylmac.adapt.bind.Slot<*>)?.peek() as? List<*>
+        val list = (pcProp as? com.ylmac.adapt.config.Slot<*>)?.peek() as? List<*>
             ?: return emptyList()
         list.mapNotNull { it?.toString() }
     } catch (_: Throwable) {
@@ -68,35 +68,35 @@ internal fun greeting(): String {
     }
 }
 
-internal fun boolPeek(prop: com.ylmac.adapt.bind.Slot<Boolean>?): Boolean =
+internal fun boolPeek(prop: com.ylmac.adapt.config.Slot<Boolean>?): Boolean =
     try {
         java.lang.Boolean.TRUE == prop?.peek()
     } catch (_: Throwable) {
         false
     }
 
-internal fun strPeek(prop: com.ylmac.adapt.bind.Slot<String>?, fallback: String = ""): String =
+internal fun strPeek(prop: com.ylmac.adapt.config.Slot<String>?, fallback: String = ""): String =
     try {
         prop?.peek()?.toString() ?: fallback
     } catch (_: Throwable) {
         fallback
     }
 
-internal fun numPeek(prop: com.ylmac.adapt.bind.Slot<out Number>?, fallback: Int = 0): Int =
+internal fun numPeek(prop: com.ylmac.adapt.config.Slot<out Number>?, fallback: Int = 0): Int =
     try {
         (prop?.peek() as? Number)?.toInt() ?: fallback
     } catch (_: Throwable) {
         fallback
     }
 
-internal fun floatPeek(prop: com.ylmac.adapt.bind.Slot<out Number>?, fallback: Float = 0f): Float =
+internal fun floatPeek(prop: com.ylmac.adapt.config.Slot<out Number>?, fallback: Float = 0f): Float =
     try {
         (prop?.peek() as? Number)?.toFloat() ?: fallback
     } catch (_: Throwable) {
         fallback
     }
 
-internal fun longPeek(prop: com.ylmac.adapt.bind.Slot<out Number>?, fallback: Long = 0L): Long =
+internal fun longPeek(prop: com.ylmac.adapt.config.Slot<out Number>?, fallback: Long = 0L): Long =
     try {
         (prop?.peek() as? Number)?.toLong() ?: fallback
     } catch (_: Throwable) {
@@ -104,7 +104,7 @@ internal fun longPeek(prop: com.ylmac.adapt.bind.Slot<out Number>?, fallback: Lo
     }
 
 /** 列表长度戳：用于 MusicShell 脏签名，避免 forever 空列表。 */
-internal fun listSize(prop: com.ylmac.adapt.bind.Slot<*>?): Int =
+internal fun listSize(prop: com.ylmac.adapt.config.Slot<*>?): Int =
     try {
         (prop?.peek() as? List<*>)?.size ?: 0
     } catch (_: Throwable) {
@@ -115,7 +115,7 @@ internal fun listSize(prop: com.ylmac.adapt.bind.Slot<*>?): Int =
  * 列表内容粗指纹：size + 首/末项 id（或 hash）。
  * 同长度整表替换时 length-only 签名会漏脏。
  */
-internal fun listStamp(prop: com.ylmac.adapt.bind.Slot<*>?): String {
+internal fun listStamp(prop: com.ylmac.adapt.config.Slot<*>?): String {
     try {
         val list = prop?.peek() as? List<*> ?: return "0"
         val n = list.size

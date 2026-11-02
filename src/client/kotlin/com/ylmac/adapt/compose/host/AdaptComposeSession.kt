@@ -31,7 +31,7 @@ import net.minecraft.resources.Identifier
 /**
  * Compose 会话：设计分辨率 scene + 无脏帧跳过（idle 只 blit 缓存纹理）。
  *
- * 性能约定（对齐 qml4j skipRender）：
+ * 性能约定：
  * - idle：performFrame 推进时钟，但跳过 clear/measure/draw/flush
  * - 动画：用 [requestAnimFrames] 短窗强制绘，而不是每次输入锁 24 帧
  * - 设备像素倍率硬顶 [MAX_DEVICE_SCALE]，避免 Retina×panel 炸出 4K UI RT
@@ -322,9 +322,9 @@ class AdaptComposeSession(
 
         return try {
             // 必须跑 performFrame：推进 FrameClock / 协程；否则 LaunchedEffect 停转
-            com.ylmac.adapt.render.Probe.begin("compose.perform")
+            com.ylmac.adapt.render.profile.Probe.begin("compose.perform")
             recomposer.performFrame(nanoTime)
-            com.ylmac.adapt.render.Probe.end("compose.perform")
+            com.ylmac.adapt.render.profile.Probe.end("compose.perform")
 
             val whyFirst = firstGpuDraw
             val whyDirty = inputDirty
@@ -339,20 +339,20 @@ class AdaptComposeSession(
                 ComposePerf.onFrame(false)
                 return false
             }
-            if (whyFirst) com.ylmac.adapt.render.Probe.hit("compose.whyFirst")
-            if (whyDirty) com.ylmac.adapt.render.Probe.hit("compose.whyDirty")
-            if (whyForce) com.ylmac.adapt.render.Probe.hit("compose.whyForce")
-            if (whyPending) com.ylmac.adapt.render.Probe.hit("compose.whyPending")
-            if (whyWork) com.ylmac.adapt.render.Probe.hit("compose.whyWork")
+            if (whyFirst) com.ylmac.adapt.render.profile.Probe.hit("compose.whyFirst")
+            if (whyDirty) com.ylmac.adapt.render.profile.Probe.hit("compose.whyDirty")
+            if (whyForce) com.ylmac.adapt.render.profile.Probe.hit("compose.whyForce")
+            if (whyPending) com.ylmac.adapt.render.profile.Probe.hit("compose.whyPending")
+            if (whyWork) com.ylmac.adapt.render.profile.Probe.hit("compose.whyWork")
 
-            com.ylmac.adapt.render.Probe.begin("compose.draw")
+            com.ylmac.adapt.render.profile.Probe.begin("compose.draw")
             skiaCanvas.clear(0x00000000)
             scene.measureAndLayout()
             scene.draw(skiaCanvas.asComposeCanvas())
-            com.ylmac.adapt.render.Probe.end("compose.draw")
-            com.ylmac.adapt.render.Probe.begin("compose.flush")
+            com.ylmac.adapt.render.profile.Probe.end("compose.draw")
+            com.ylmac.adapt.render.profile.Probe.begin("compose.flush")
             surface.flush(syncCpu = false)
-            com.ylmac.adapt.render.Probe.end("compose.flush")
+            com.ylmac.adapt.render.profile.Probe.end("compose.flush")
             firstGpuDraw = false
             inputDirty = false
             if (forceDrawFrames > 0) forceDrawFrames--
@@ -380,9 +380,9 @@ class AdaptComposeSession(
     }
 
     /**
-     * 动画补帧窗。150ms tween @60fps ≈ 9 帧；默认 12 留余量。
-     * 仅交互触发的 animate*AsState（开关/分段）应调用。
-     */
+ * 动画补帧窗。150ms tween @60fps ≈ 9 帧；默认 12 留余量。
+ * 仅交互触发的 animate*AsState（开关/分段）应调用。
+ */
     fun requestAnimFrames(frames: Int = 12) {
         inputDirty = true
         forceDrawFrames = maxOf(forceDrawFrames, frames.coerceIn(1, 24))
@@ -399,7 +399,6 @@ class AdaptComposeSession(
     }
 
     fun dispatchMoveDesign(x: Float, y: Float) {
-        // 对齐 QmlScreen：位移² > 0.25 才派发，压掉 hover 抖动脉冲
         if (!lastPointerX.isNaN()) {
             val dx = x - lastPointerX
             val dy = y - lastPointerY

@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
 
-/** MD3 Switch — 对齐 qml-retired/md3/Core/Switch.qml（52×32 track）。 */
+/** MD3 Switch，轨道 52×32。 */
 @Composable
 fun Md3Switch(
     checked: Boolean,

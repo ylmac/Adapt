@@ -2,15 +2,15 @@
 
 // G-buffer 几何阶段 vsh（延迟渲染）：输出与 sodium_terrain.vsh 完全相同，
 // 供 G-buffer fsh 写位置/法线/albedo/fog 数据（不做光照）。
-// r5 世界光照（adaptDoLighting）：
-// - lmCoordM：GetLightMapCoordinates 处理后的光照贴图坐标（0-1，r5
-//   commonFunctions.glsl:2-4：clamp((uv - 0.03125) * 1.06667, 0, 1)）。
-//   Sodium _vert_tex_light_coord = a_LightAndData.xy / 256（0.03-0.97），
-//   与 r5 的 gl_TextureMatrix[1]*gl_MultiTexCoord1 同编码，直接套公式。
+// 世界光照（adaptDoLighting）：
+// - lmCoordM：GetLightMapCoordinates 处理后的光照贴图坐标（0-1，
+// ：clamp((uv - 0.03125) * 1.06667, 0, 1)）。
+// Sodium _vert_tex_light_coord = a_LightAndData.xy / 256（0.03-0.97），
+// 与 的 gl_TextureMatrix[1]*gl_MultiTexCoord1 同编码，直接套公式。
 // - adaptVertexColor：未线性化的顶点色（a_Color 0-1 UNORM，AO 预乘进 RGB；
-//   r5 gbuffers_terrain.glsl:219 color.rgb *= glColor.rgb 直接乘，不做 pow2.2）
+// color.rgb *= glColor.rgb 直接乘，不做 pow2.2）
 // - adaptFragPos / adaptWorldPos：视空间片元位置 / 世界相对位置（halo 光照、
-//   导数法线、阴影接收用；adaptWorldPos 与 caster 几何同空间）
+// 导数法线、阴影接收用；adaptWorldPos 与 caster 几何同空间）
 // v_Color 通道保留原版语义（alpha 恒 1，Sodium 压缩格式无 AO alpha）。
 
 #moj_import <sodium:globals.glsl>
@@ -76,13 +76,13 @@ void main() {
     // Transform the vertex position into model-view-projection space
     gl_Position = u_ProjectionMatrix * u_ModelViewMatrix * vec4(position, 1.0);
 
-    // ---- Adapt/Reimagined r5 顶点阶段 ----
-    // 顶点色原样传递（不做 pow2.2 —— r5 albedo = tex * glColor.rgb 直接乘）
+    // ---- Adapt/ 顶点阶段 ----
+    // 顶点色原样传递（不做 pow2.2 — albedo = tex * glColor.rgb 直接乘）
     adaptVertexColor = _vert_color;
-    // GetLightMapCoordinates（r5 commonFunctions.glsl:2-4）
+    // GetLightMapCoordinates
     lmCoordM = clamp((_vert_tex_light_coord - 0.03125) * 1.06667, 0.0, 1.0);
     adaptFragPos = (u_ModelViewMatrix * vec4(position, 1.0)).xyz;
-    // 世界相对位置（与 caster 几何同空间）——阴影接收用
+    // 世界相对位置（与 caster 几何同空间）—阴影接收用
     adaptWorldPos = position;
 
     v_Color = _vert_color * texture(u_LightTex, _vert_tex_light_coord);

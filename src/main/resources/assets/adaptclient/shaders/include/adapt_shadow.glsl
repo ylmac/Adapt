@@ -1,17 +1,16 @@
 #version 330
 
-// Native Vulkan directional shadow receiver — VERIFIED by the offscreen
-// Vulkan simulator (shadow-sim/ShadowSimVk.java) against Beryl's chain.
-//
+// Directional shadow receiver.
+
 // Verified facts:
-//  - LightViewProjection = lightProjection * lightView * T(camPos % 2)
-//  - Input position is WORLD-RELATIVE (regionPos - camPos), same as the caster
-//    geometry -> the shadow is fixed on world geometry (no view-rotation math).
-//  - Depth is forward-Z after the distort remap (z*0.5+0.5): near light = small,
-//    far = large. Caster: clear 1.0, depthFunc LESS_OR_EQUAL.
-//  - 26.2's Vulkan textures are NOT y-flipped (unlike VulkanMod): the receiver
-//    samples with uv = ndc.xy*0.5+0.5 DIRECTLY (no `y = -y`).
-//  - Lit when compareDepth <= storedDepth (forward-Z, LESS compare semantics).
+// - LightViewProjection = lightProjection * lightView * T(camPos % 2)
+// - Input position is WORLD-RELATIVE (regionPos - camPos), same as the caster
+// geometry -> the shadow is fixed on world geometry (no view-rotation math).
+// - Depth is forward-Z after the distort remap (z*0.5+0.5): near light = small,
+// far = large. Caster: clear 1.0, depthFunc LESS_OR_EQUAL.
+// - 26.2's Vulkan textures are NOT y-flipped (unlike VulkanMod): the receiver
+// samples with uv = ndc.xy*0.5+0.5 DIRECTLY (no `y = -y`).
+// - Lit when compareDepth <= storedDepth (forward-Z, LESS compare semantics).
 
 layout(std140) uniform ShadowFrame {
     mat4 LightViewProjection; // world-relative + T(camPos%2) -> light clip
@@ -28,7 +27,7 @@ uniform sampler2D SkyOcclusionSampler;
  * 天光可见度（"这一点能看到多少天空"），原版 lightmap sky 通道的自建替代。
  * <p>
  * <b>为什么不能是二值的顶视深度比较。</b>上一版对同一个 texel 做
- * {@code fragDepth <= stored + bias ? 1 : 0}，3×3 求平均。那是**方向性**的
+ * {@code fragDepth <= stored + bias ? 1: 0}，3×3 求平均。那是**方向性**的
  * 遮挡测试：光源被隐含地设成"正上方无穷远的点"，于是任何遮挡物都在地面上
  * 投出一条与太阳方向无关的、垂直向下的硬轮廓。实测正是"树叶以及不知道
  * 什么，都会有一个笔直在地面上的影子 90°……太阳也会产生真的位置的影子，
@@ -37,7 +36,7 @@ uniform sampler2D SkyOcclusionSampler;
  * <p>
  * <b>正确语义是半球可见度（AO/天光锥），不是方向影。</b>天空是面积光源，
  * 覆盖整个上半球。一个点的天光可见度取决于**它周围一大片**头顶有没有东西，
- * 而且随距离平滑衰减 —— 屋檐外一格就该几乎全亮，不该有硬边。
+ * 而且随距离平滑衰减 — 屋檐外一格就该几乎全亮，不该有硬边。
  * <p>
  * 实现：在顶视图上按世界尺度做多环锥形采样（半径 0.5→6 格），每个样本比较
  * "头顶遮挡物比我高多少"，用 smoothstep 把它变成 0-1 的软遮挡（高出 0 格
@@ -87,7 +86,7 @@ float adaptSkyVisibility(vec3 worldRelPos) {
     // (fragDepth - stored) / depthPerBlock = 遮挡物比我高多少格。
     float heightAbove = (fragDepth - stored - bias) / depthPerBlock;
     // 软遮挡：高出 0 格不算遮（自己就是最高的），高出 4 格算全遮。
-    // 这条 smoothstep 是"没有硬边"的关键 —— 二值比较在这里产生硬轮廓。
+    // 这条 smoothstep 是"没有硬边"的关键 — 二值比较在这里产生硬轮廓。
     float occ = smoothstep(0.0, 4.0, heightAbove);
     float total = 1.5 * occ;
     float weightSum = 1.5;
@@ -123,16 +122,16 @@ float adaptShadowVisibility(vec3 worldRelPos, vec3 normalView) {
     }
 
     vec3 projected = lightClip.xyz / lightClip.w;
-    // **不做 Beryl 的 distort**（ShadowParams.w 恒 0）。
-    //
-    // Beryl 的 receiver 之所以能 distort，是因为它在 terrain.vsh:110 的
-    // **顶点阶段**做 —— 光栅器的线性插值误差 caster/receiver 两边都有、正好
+    // **不做 的 distort**（ShadowParams.w 恒 0）。
+    
+    // 的 receiver 之所以能 distort，是因为它在 terrain.vsh:110 的
+    // **顶点阶段**做 — 光栅器的线性插值误差 caster/receiver 两边都有、正好
     // 抵消。Adapt 是延迟管线，receiver 是全屏 pass，只能逐像素精确求 distort，
     // 而 caster 仍是逐顶点 + 线性插值。离线数值（DistortSim，16 格 quad）：
-    //   中点ndc 0.042 → caster 插值 0.23810，receiver 精确 0.30303
-    //                  差 66 texel ≈ 1.25 格
-    //   中点ndc 0.442 → 差 1 texel ≈ 0.52 格
-    // x/(|x|·0.9+0.1) 是强非线性，屏幕中心（玩家脚下）错位最大 —— 实测
+    // 中点ndc 0.042 → caster 插值 0.23810，receiver 精确 0.30303
+    // 差 66 texel ≈ 1.25 格
+    // 中点ndc 0.442 → 差 1 texel ≈ 0.52 格
+    // x/(|x|·0.9+0.1) 是强非线性，屏幕中心（玩家脚下）错位最大 — 实测
     // "太阳影子有点错位"。逐 quad 的顶点阶段在延迟管线里不存在，这个误差
     // 原理上无法消除，所以两边一起不 distort：恒等变换，误差 0。
     // 代价是每格从 distort 的中心 10× 放大降到均匀 5.33 texel/格。
@@ -149,12 +148,12 @@ float adaptShadowVisibility(vec3 worldRelPos, vec3 normalView) {
 
     vec3 lightDirection = normalize(SunDirection);
     // bias 全部用**世界格**表达，再乘 depthPerBlock 换成深度单位。
-    //
-    // 旧式是 Beryl 的 `1e-4 + 0.002*dist²`：换算过后常量项只有 0.05 格
+    
+    // 旧式是 的 `1e-4 + 0.002*dist²`：换算过后常量项只有 0.05 格
     // （挡不住自阴影），dist² 项在屏幕边缘是 2.05 格（影子从投影物脚下脱开
-    // ——错位的第二个来源）。dist² 本来是给 distort 的可变 texel 足迹擦屁股，
+    // —错位的第二个来源）。dist² 本来是给 distort 的可变 texel 足迹擦屁股，
     // distort 去掉后它是纯误差，必须一起删。
-    //
+    
     // 现在：常量 0.05 格打底 + 斜率项。斜率项的物理含义是"一个 texel 宽的
     // 斜面，两端的高度差"= texelWorldSize × tan(θ)，θ 是面与光的夹角。
     // tan = sqrt(1-c²)/c，c=NdotL；c 很小时 tan 爆炸，所以 clamp 到 4 倍
@@ -168,7 +167,7 @@ float adaptShadowVisibility(vec3 worldRelPos, vec3 normalView) {
     float texel = ShadowParams.x;
 
     // 3×3 PCF，间距 1 texel。4096² 下一个 texel = 0.09375 格，所以整个核
-    // 只有 0.28 格宽 —— 影子边缘锐利。（2048² 时是 0.56 格，实测"好糊"，
+    // 只有 0.28 格宽 — 影子边缘锐利。（2048² 时是 0.56 格，实测"好糊"，
     // 那是分辨率不足而不是核太大：distort 去掉后每格只剩 5.33 texel。）
     float visibility = 0.0;
     // Forward-Z: a fragment is LIT when its depth is not beyond the nearest

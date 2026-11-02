@@ -28,7 +28,7 @@ import java.io.File
 import java.net.URI
 
 /**
- * QML CoverImage.qml — rounded art with `music_note` (or custom) placeholder.
+ * — rounded art with `music_note` (or custom) placeholder.
  * Prefer local path / bytes; fall back to http(s) URL when possible.
  */
 @Composable

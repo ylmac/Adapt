@@ -1,11 +1,11 @@
 #version 330 core
 
 // 统一合成 pass：HDR 场景 + 降噪后的直接光 → 单次 tonemap → 雾 → 主颜色。
-//
+
 // 为什么要单独一趟：旧管线在光照 pass 里当场 tonemap，导致直接光的降噪
 // 只能在 tonemap 之后做（非线性空间里滤波会把亮部糊成灰）。现代管线
 // （Lumen / MegaLights）统一在线性 HDR 空间累加所有光照，最后一次
-// tonemap —— 各 pass 各自 tonemap 会让色彩空间不一致。
+// tonemap — 各 pass 各自 tonemap 会让色彩空间不一致。
 
 #moj_import <adaptclient:adapt_lighting.glsl>
 
@@ -54,7 +54,7 @@ void main() {
         return;
     }
 
-    // 线性空间累加，然后一次 tonemap（Reimagined composite5 的 Lottes）
+    // 线性空间累加，然后一次 tonemap（composite5 的 Lottes）
     vec3 tone = adaptTonemapLottes(scene + direct);
 
     // alpha=1.0：主颜色在帧开始被清成 alpha=0，不透明地形被 G-buffer 接管后

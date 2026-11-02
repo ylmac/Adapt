@@ -26,10 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3SegmentedButton
-import com.ylmac.adapt.features.music.PlayerController
-// Md3SegmentedButton: QML SegmentedButton (primary + check)
+import com.ylmac.adapt.module.misc.music.PlayerController
+// Md3SegmentedButton: SegmentedButton (primary + check)
 
-/** QueuePage.qml — segmented 播放队列 / 播放列表, removable rows. */
+/** — segmented 播放队列 / 播放列表, removable rows. */
 @Composable
 fun QueuePage(
     pc: PlayerController,

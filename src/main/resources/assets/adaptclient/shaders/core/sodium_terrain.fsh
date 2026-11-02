@@ -1,13 +1,13 @@
 #version 330 core
 
 // Adapt 对 Sodium 地形管线的 shader 副本（基于 sodium-fabric 0.9.1-beta.2
-// 的 blocks/block_layer_opaque.fsh）。世界光照 = Complementary Reimagined r5
-// 逐字移植（adaptDoLighting，见 adapt_lighting.glsl）：
-//   albedo = tex * glColor.rgb（无 pow2.2 线性化，r5 gbuffers_terrain.glsl:219）
-//   finalDiffuse = pow2(directionShade * vanillaAO)
-//               * (blockLighting + pow2(sceneLighting) + minLighting)
-//   color.rgb *= sqrt(max(finalDiffuse, 0))   （mainLighting.glsl:611-616）
-// 输出经 composite5.glsl 的 Lottes tonemap + LinearToRGB（adaptTonemapLottes）。
+// 的 blocks/block_layer_opaque.fsh）。世界光照 =
+// （adaptDoLighting，见 adapt_lighting.glsl）：
+// albedo = tex * glColor.rgb（无 pow2.2 线性化， ）
+// finalDiffuse = pow2(directionShade * vanillaAO)
+// * (blockLighting + pow2(sceneLighting) + minLighting)
+// color.rgb *= sqrt(max(finalDiffuse, 0))
+// 输出经 的 Lottes tonemap + LinearToRGB（adaptTonemapLottes）。
 // sodium 的 RGSS 采样、雾（_linearFog）与 chunk 淡出原样保留。法线由解析
 // 导数重建（sodium 压缩顶点格式无法线属性，与 vanilla adapt_terrain 相同）。
 // halo 点光源（adaptHaloLights）在 tonemap 前额外叠加（真实点光 GGX）。
@@ -22,7 +22,7 @@ in vec4 v_Color; // The interpolated vertex color
 in vec2 v_TexCoord; // The interpolated block texture coordinates
 in vec2 v_FragDistance; // The fragment's distance from the camera (cylindrical and spherical)
 in float fadeFactor;
-in vec2 lmCoordM; // Reimagined GetLightMapCoordinates 处理后的光照贴图坐标（0-1）
+in vec2 lmCoordM; // GetLightMapCoordinates 处理后的光照贴图坐标（0-1）
 in vec4 adaptVertexColor; // 原版顶点色（AO 预乘 RGB，alpha 恒 1）
 in vec3 adaptFragPos; // Adapt：视空间片元位置
 in vec3 adaptWorldPos; // Adapt：世界相对片元位置
@@ -103,8 +103,8 @@ void main() {
     }
 #endif
 
-    // ---- Reimagined r5 世界光照（mainLighting.glsl DoLighting）----
-    // albedo = tex * glColor.rgb —— 无 pow2.2 线性化（r5 gbuffers_terrain.glsl:219；
+    // ---- 世界光照----
+    // albedo = tex * glColor.rgb — 无 pow2.2 线性化（；
     // Sodium a_Color 0-1 UNORM 含 AO，直接乘）
     vec3 albedo = color.rgb * adaptVertexColor.rgb;
     color.rgb = albedo;
@@ -127,7 +127,7 @@ void main() {
 
     // 发光方块自发光（P6）：26.2/Sodium 无法在 shader 拿到真实 Block ID
     // （Sodium 顶点格式只有 light/material bits/section，javap 证实无 mc_Entity；
-    // quad.emissive 已被消费成全亮 light 不进顶点——P6 代理核实）。因此
+    // quad.emissive 已被消费成全亮 light 不进顶点—P6 代理核实）。因此
     // 任何基于纹理色彩/luminance 的 emission 判断都会误伤沙子/花岗岩/铁矿/
     // 金矿等亮暖色方块（用户实测），禁止使用颜色猜测。
     // 正确实现（后续）：Java 侧在 Sodium chunk build 阶段按真实 BlockState
@@ -137,8 +137,8 @@ void main() {
     float emissive = 0.0;
 
     // vanillaAO：Sodium a_Color 的 alpha 恒 1（AO 预乘进 RGB），
-    // 传入 1.0 —— 等价 r5 glColor.a=1（AO 曲线在 adaptDoLighting 内保留）。
-    // entityShading=0：普通地形（r5 GBUFFERS_TERRAIN 不走 L144-146 实体分支）
+    // 传入 1.0 — 等价 glColor.a=1（AO 曲线在 adaptDoLighting 内保留）。
+    // entityShading=0：普通地形
     adaptDoLighting(color, lmCoordM, N, adaptWorldPos, length(adaptFragPos),
             shadowVisibility, 1.0, emissive, 0.0);
 
@@ -149,7 +149,7 @@ void main() {
     float roughness = 0.8;
     color.rgb += adaptHaloLights(V, N, adaptFragPos, albedo, F0, roughness);
 
-    // Reimagined composite5.glsl 的 Lottes tonemap + LinearToRGB
+    // 的 Lottes tonemap + LinearToRGB
     color.rgb = adaptTonemapLottes(color.rgb);
 
     // alpha 保留顶点色 alpha（透明方块/淡出）

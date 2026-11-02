@@ -23,11 +23,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ylmac.adapt.compose.theme.MonetScheme
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 import kotlin.math.floor
 import kotlin.math.max
 
-/** HomePage.qml — greeting + recommend playlist grid + 每日推荐 SongRows. */
+/** — greeting + recommend playlist grid + 每日推荐 SongRows. */
 @Composable
 fun HomePage(
     pc: PlayerController,

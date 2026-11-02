@@ -38,11 +38,11 @@ import com.ylmac.adapt.compose.theme.MonetScheme
 import com.ylmac.adapt.compose.ui.Md3FilledButton
 import com.ylmac.adapt.compose.ui.Md3LoadingIndicator
 import com.ylmac.adapt.compose.ui.Md3TextField
-import com.ylmac.adapt.features.music.PlayerController
+import com.ylmac.adapt.module.misc.music.PlayerController
 import kotlinx.coroutines.delay
 import kotlin.math.min
 
-/** SearchPage.qml — 350ms debounce, history expand levels, hot searches, searchRows. */
+/** — 350ms debounce, history expand levels, hot searches, searchRows. */
 @Composable
 fun SearchPage(
     pc: PlayerController,
